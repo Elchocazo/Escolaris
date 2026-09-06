@@ -1,0 +1,34 @@
+{
+  "project_info": {
+    "project_number": "1039847291823",
+    "project_id": "escolaris-ab151",
+    "storage_bucket": "escolaris-ab151.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1039847291823:android:98b472e3a1f8c49210eb5a",
+        "android_client_info": {
+          "package_name": "com.aistudio.escolaris.net"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "1039847291823-clientoauthsample.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDummyKeyForEscolarisProjectConfig"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

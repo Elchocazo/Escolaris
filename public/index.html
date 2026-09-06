@@ -1,0 +1,2398 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Escolaris - Plataforma Escolar</title>
+
+  <!-- PWA & Apple iOS Tags -->
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#2563eb">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Escolaris">
+  <link rel="apple-touch-icon" href="/logo.png">
+  <link rel="icon" type="image/png" href="/logo.png">
+
+  <!-- Stylesheet -->
+  <link rel="stylesheet" href="/styles.css?v=4.5">
+
+  <!-- Firebase App & Services -->
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+  <script src="/__/firebase/init.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+</head>
+<body>
+
+<div id="app-container">
+
+  <!-- LOADING BOOT SPLASH (Elimina el destello de login en recargas) -->
+  <div id="app-boot-splash" style="display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:80vh; gap:16px; padding:20px; text-align:center;">
+    <div style="width:72px; height:72px; border-radius:20px; background:linear-gradient(135deg, #2563eb, #7c3aed); display:flex; align-items:center; justify-content:center; font-size:38px; box-shadow:0 12px 28px rgba(37,99,235,0.3);">🏫</div>
+    <div>
+      <h2 style="margin:0; font-size:20px; font-weight:900; color:var(--text-main);">Colegio Hogar Madre de Dios</h2>
+      <p style="margin:4px 0 0 0; font-size:13px; color:var(--text-muted);">Cargando tu espacio escolar...</p>
+    </div>
+  </div>
+
+  <!-- AUTH VIEW (Sign In / Register) -->
+  <div id="auth-view" class="view-container auth-wrapper hidden" style="display:none;">
+    <div class="clay-card auth-card">
+      <div class="auth-logo">
+        <img src="/logo.png" alt="Escolaris Logo" class="auth-logo-img">
+      </div>
+      <h1 class="auth-title">Escolaris</h1>
+      <p class="auth-subtitle">Tu vida escolar gamificada y organizada</p>
+
+      <div class="auth-tabs">
+        <button id="tab-login-btn" class="btn-primary tab-btn active" onclick="switchAuthTab('login')">Ingresar</button>
+        <button id="tab-signup-btn" class="btn-secondary tab-btn" onclick="switchAuthTab('signup')">Registrarme</button>
+      </div>
+
+      <!-- Google Sign In Button (Top Quick Access) -->
+      <button type="button" class="btn-google" onclick="handleGoogleSignIn()">
+        <svg width="18" height="18" viewBox="0 0 24 24">
+          <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+          <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+          <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
+          <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
+        </svg>
+        <span>Continuar con Google</span>
+      </button>
+
+      <div class="divider-or">
+        <div class="divider-line"></div>
+        <span class="divider-text">O CON CORREO</span>
+        <div class="divider-line"></div>
+      </div>
+
+      <!-- Login Form -->
+      <form id="login-form" class="auth-form" onsubmit="handleLogin(event)">
+        <div class="form-group">
+          <label class="form-label">Correo Electrónico</label>
+          <input type="email" id="login-email" class="form-input" placeholder="ejemplo@colegio.edu" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Contraseña</label>
+          <input type="password" id="login-password" class="form-input" placeholder="••••••••" required>
+        </div>
+        <button type="submit" class="btn-primary submit-btn">Iniciar Sesión 🚀</button>
+      </form>
+
+      <!-- Signup Form -->
+      <form id="signup-form" class="auth-form hidden" onsubmit="handleSignup(event)">
+        <div class="form-group">
+          <label class="form-label">Nombres y Apellidos</label>
+          <input type="text" id="signup-name" class="form-input" placeholder="Ej: Camilo Andrés Rojas" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Correo Electrónico</label>
+          <input type="email" id="signup-email" class="form-input" placeholder="correo@ejemplo.com" required>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">¿Cuál es tu rol?</label>
+          <div class="role-picker-grid">
+            <div class="role-card selected" id="signup-role-student" onclick="selectSignupRole('STUDENT')">
+              <div class="role-card-icon">🎓</div>
+              <div class="role-card-title">Estudiante</div>
+            </div>
+            <div class="role-card" id="signup-role-teacher" onclick="selectSignupRole('TEACHER')">
+              <div class="role-card-icon">👨‍🏫</div>
+              <div class="role-card-title">Docente</div>
+            </div>
+            <div class="role-card" id="signup-role-parent" onclick="selectSignupRole('PARENT')">
+              <div class="role-card-icon">👨‍👩‍👧</div>
+              <div class="role-card-title">Acudiente</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Conditional Field: Student Grade -->
+        <div class="form-group" id="signup-group-grade">
+          <label class="form-label">Grado Escolar</label>
+          <select id="signup-grade" class="form-select">
+            <option value="10° Grado">10° Grado</option>
+            <option value="11° Grado">11° Grado</option>
+            <option value="9° Grado">9° Grado</option>
+            <option value="8° Grado">8° Grado</option>
+            <option value="7° Grado">7° Grado</option>
+            <option value="6° Grado">6° Grado</option>
+          </select>
+        </div>
+
+        <!-- Conditional Field: Teacher Subject -->
+        <div class="form-group hidden" id="signup-group-teacher">
+          <label class="form-label">Materia o Especialidad</label>
+          <input type="text" id="signup-teacher-subject" class="form-input" placeholder="Ej: Matemáticas, Ciencias, Titular...">
+        </div>
+
+        <!-- Conditional Field: Parent Child Code -->
+        <div class="form-group hidden" id="signup-group-parent">
+          <label class="form-label">Código del Estudiante (Opcional)</label>
+          <input type="text" id="signup-child-code" class="form-input" placeholder="ESC-XXXXXX">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Contraseña (Mínimo 6 caracteres)</label>
+          <input type="password" id="signup-password" class="form-input" placeholder="••••••••" required minlength="6">
+        </div>
+        <button type="submit" class="btn-primary submit-btn">Crear Cuenta ✨</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- MAIN APP CONTAINER -->
+  <div id="main-app" class="main-app-wrapper hidden" style="display:none;">
+    
+    <!-- DESKTOP LEFT SIDEBAR (Fixed on desktop, hidden on mobile) -->
+    <aside class="desktop-sidebar" id="desktop-sidebar">
+      <div>
+        <div class="sidebar-brand">
+          <img src="/logo.png" alt="Escolaris" class="sidebar-brand-img">
+          <div>
+            <div class="sidebar-brand-name">Escolaris</div>
+            <div style="font-size: 10px; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">Portal Web Escolar</div>
+          </div>
+        </div>
+
+        <!-- Sidebar User Mini Card -->
+        <div class="sidebar-user-card">
+          <div class="sidebar-user-header">
+            <div class="sidebar-avatar" id="sidebar-avatar-emoji">🎓</div>
+            <div style="flex:1; min-width:0;">
+              <div class="sidebar-user-name" id="sidebar-user-name">Cargando...</div>
+              <div id="sidebar-role-badge" class="user-role-badge" style="font-size:10px; padding:2px 6px;">Estudiante</div>
+            </div>
+          </div>
+          <div style="display:flex; justify-content:space-between; font-size:11px; font-weight:700; color:var(--text-muted);">
+            <span id="sidebar-xp-text">0 / 300 XP</span>
+            <span id="sidebar-level-text" style="color:var(--primary);">Nivel 1</span>
+          </div>
+          <div class="progress-bar-bg" style="height:6px;">
+            <div id="sidebar-xp-bar" class="progress-bar-fill" style="width: 0%;"></div>
+          </div>
+        </div>
+
+        <!-- Navigation Menu Links -->
+        <nav class="sidebar-nav-list" id="desktop-sidebar-nav">
+          <!-- Populated dynamically by JS for each role -->
+        </nav>
+      </div>
+
+      <!-- Sidebar Footer -->
+      <div class="sidebar-footer">
+        <button class="sidebar-nav-item" onclick="openOnboardingModal(true)">
+          <span class="sidebar-nav-icon">✏️</span>
+          <span>Configurar Rol</span>
+        </button>
+        <button class="sidebar-nav-item" onclick="toggleDarkMode()">
+          <span class="sidebar-nav-icon">🌓</span>
+          <span>Modo Oscuro</span>
+        </button>
+        <button class="sidebar-nav-item" style="color:var(--danger);" onclick="handleSignOut()">
+          <span class="sidebar-nav-icon">🚪</span>
+          <span>Cerrar Sesión</span>
+        </button>
+      </div>
+    </aside>
+
+    <!-- DESKTOP CONTENT AREA (Full flex-1 container) -->
+    <div class="desktop-content-area">
+
+      <!-- MOBILE TOP HEADER (Sticky on mobile, hidden on desktop) -->
+      <header class="top-header">
+        <div class="brand-section">
+          <button id="mobile-btn-back" class="btn-back-nav hidden" onclick="goBack()" title="Volver a la pantalla anterior">
+            <span>←</span>
+          </button>
+          <img src="/logo.png" alt="Escolaris" class="mobile-brand-img">
+          <div>
+            <div class="brand-name">Escolaris</div>
+            <div id="top-role-badge" class="user-role-badge">Estudiante</div>
+          </div>
+        </div>
+        <div class="header-stats">
+          <div class="stat-pill streak" id="header-streak-pill"><span id="header-streak">🔥 0</span></div>
+          <div class="stat-pill coin" id="header-coins-pill"><span id="header-coins">🪙 0</span></div>
+          <button class="btn-icon" onclick="toggleDarkMode()" title="Cambiar tema">🌙</button>
+        </div>
+      </header>
+
+      <!-- DESKTOP TOP HEADER BAR (Sticky on desktop, hidden on mobile) -->
+      <header class="desktop-header-bar">
+        <div style="display:flex; align-items:center; gap:12px;">
+          <button id="desktop-btn-back" class="btn-back-nav hidden" onclick="goBack()" title="Volver a la pantalla anterior">
+            <span>← Volver</span>
+          </button>
+          <div>
+            <div class="desktop-header-title" id="desktop-view-title">Muro de Avisos y Comunidad</div>
+            <div class="desktop-header-subtitle" id="desktop-view-subtitle">Plataforma escolar colaborativa y gamificada</div>
+          </div>
+        </div>
+        <div class="desktop-header-actions">
+          <div class="stat-pill streak"><span id="desktop-header-streak">🔥 0 días</span></div>
+          <div class="stat-pill coin"><span id="desktop-header-coins">🪙 0 créditos</span></div>
+          <button class="btn-icon" onclick="toggleDarkMode()" title="Cambiar tema">🌙</button>
+          <div style="display:flex; align-items:center; gap:8px; cursor:pointer;" onclick="switchNav('profile')">
+            <div class="sidebar-avatar" id="desktop-header-avatar" style="width:38px; height:38px; font-size:22px;">🎓</div>
+          </div>
+        </div>
+      </header>
+
+      <!-- iOS Installation Tip Banner (Mobile only) -->
+      <div id="ios-pwa-banner" class="ios-banner-container hidden">
+        <div class="ios-banner">
+          <div class="ios-icon">📲</div>
+          <div class="ios-banner-text">
+            <strong>¿Usas iPhone?</strong> Toca el botón <strong>Compartir</strong> (icono ⬆️) y selecciona <strong>"Agregar a pantalla de inicio"</strong> para instalarla.
+          </div>
+          <button class="btn-banner-close" onclick="dismissIosBanner()">✕</button>
+        </div>
+      </div>
+
+      <!-- MOBILE STUDENT QUICK HUB (Cinta deslizante superior de acceso rápido) -->
+      <div id="mobile-student-quick-hub" class="mobile-quick-hub"></div>
+
+      <!-- VIEW 1: FEED (Muro Escolar) -->
+      <div id="view-feed" class="view-container tab-view">
+        <div class="feed-desktop-split">
+          <div>
+            <div class="clay-card banner-feed-card" style="margin-bottom:16px;">
+              <div class="feed-header-row">
+                <div>
+                  <h3 class="feed-title">Muro de Avisos y Apuntes</h3>
+                  <p class="feed-subtitle">Comunidad académica y comunicados oficiales</p>
+                </div>
+                <button id="btn-create-post-feed" class="btn-primary btn-sm" onclick="openModal('modal-post')">Publicar ✍️</button>
+              </div>
+            </div>
+
+
+
+            <div id="feed-posts-list" class="cards-column">
+              <!-- Dynamic posts list -->
+            </div>
+          </div>
+
+          <!-- Desktop Right Widget Sidebar -->
+          <div class="desktop-widget-sidebar">
+            <div class="clay-card" style="margin-bottom:16px;">
+              <h4 style="font-size:14px; font-weight:800; margin-bottom:8px;">📢 Publicar Aviso</h4>
+              <p style="font-size:11px; color:var(--text-muted); margin-bottom:12px;">Comparte anuncios de clase, dudas o material de estudio con tus compañeros.</p>
+              <button class="btn-primary w-full btn-sm" onclick="openModal('modal-post')">Crear Publicación ✍️</button>
+            </div>
+
+            <div class="clay-card" style="margin-bottom:16px;">
+              <h4 style="font-size:14px; font-weight:800; margin-bottom:8px;">🎯 Próximas Entregas</h4>
+              <div id="feed-sidebar-tasks-preview" class="cards-column" style="gap:6px;">
+                <!-- Populated by JS -->
+              </div>
+            </div>
+
+            <div class="clay-card">
+              <h4 style="font-size:14px; font-weight:800; margin-bottom:8px;">🏆 Cuadro de Honor</h4>
+              <div id="feed-sidebar-ranking-preview" class="cards-column" style="gap:6px;">
+                <!-- Populated by JS -->
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- VIEW 2: TEACHER ADMIN DASHBOARD (Panel de Administración Escolar) -->
+      <div id="view-teacher-admin" class="view-container tab-view hidden">
+        <div class="section-header-row">
+          <div>
+            <h2 class="section-title">Centro de Control & Administración Escolar</h2>
+            <p class="feed-subtitle">Gestión integral de usuarios, aprobación de logros, canjes y métricas</p>
+          </div>
+          <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <button class="btn-secondary btn-sm" onclick="openModal('modal-add-user')">👤 + Agregar Persona</button>
+            <button class="btn-primary btn-sm" onclick="openModal('modal-grant-badge')">🎖️ + Otorgar Logro</button>
+          </div>
+        </div>
+
+        <!-- Teacher Classroom Code Banner -->
+        <div class="clay-card" style="margin-bottom:14px; background:linear-gradient(135deg, #eff6ff, #dbeafe); border:1.5px solid #93c5fd;">
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+            <div>
+              <div style="font-size:11px; font-weight:800; color:var(--primary); text-transform:uppercase;">🏫 Código Único de tu Aula</div>
+              <div style="font-size:15px; font-weight:800; color:var(--text-main); margin-top:2px;">
+                Código de Aula para Alumnos: <span id="admin-teacher-code-text" style="color:var(--primary); font-family:monospace; background:rgba(37,99,235,0.12); padding:3px 10px; border-radius:8px; font-weight:900;">DOC-000000</span>
+              </div>
+              <div style="font-size:11px; color:var(--text-muted); margin-top:2px;">Comparte este código para que tus estudiantes se vinculen a tu aula y reciban tareas.</div>
+            </div>
+            <button class="btn-primary btn-sm" onclick="copyTeacherCode()">Copiar Código 📋</button>
+          </div>
+        </div>
+
+        <!-- KPI Metrics Overview Cards -->
+        <div class="admin-kpi-grid" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(130px, 1fr)); gap:10px; margin-bottom:16px;">
+          <div class="clay-card kpi-card" style="padding:12px; text-align:center; border-top:3px solid var(--primary);">
+            <div style="font-size:18px;">🎓</div>
+            <div id="metric-students-count" style="font-size:20px; font-weight:900; color:var(--primary);">0</div>
+            <div style="font-size:10px; font-weight:700; color:var(--text-muted); text-transform:uppercase;">Estudiantes</div>
+          </div>
+          <div class="clay-card kpi-card" style="padding:12px; text-align:center; border-top:3px solid #059669;">
+            <div style="font-size:18px;">👨‍🏫</div>
+            <div id="metric-teachers-count" style="font-size:20px; font-weight:900; color:#059669;">0</div>
+            <div style="font-size:10px; font-weight:700; color:var(--text-muted); text-transform:uppercase;">Docentes</div>
+          </div>
+          <div class="clay-card kpi-card" style="padding:12px; text-align:center; border-top:3px solid #7c3aed;">
+            <div style="font-size:18px;">👨‍👩‍👧</div>
+            <div id="metric-parents-count" style="font-size:20px; font-weight:900; color:#7c3aed;">0</div>
+            <div style="font-size:10px; font-weight:700; color:var(--text-muted); text-transform:uppercase;">Acudientes</div>
+          </div>
+          <div class="clay-card kpi-card" style="padding:12px; text-align:center; border-top:3px solid var(--coin-gold);">
+            <div style="font-size:18px;">🎖️</div>
+            <div id="metric-badges-count" style="font-size:20px; font-weight:900; color:var(--coin-gold);">0</div>
+            <div style="font-size:10px; font-weight:700; color:var(--text-muted); text-transform:uppercase;">Logros</div>
+          </div>
+          <div class="clay-card kpi-card" style="padding:12px; text-align:center; border-top:3px solid var(--danger);">
+            <div style="font-size:18px;">🎟️</div>
+            <div id="metric-passes-count" style="font-size:20px; font-weight:900; color:var(--danger);">0</div>
+            <div style="font-size:10px; font-weight:700; color:var(--text-muted); text-transform:uppercase;">Canjes</div>
+          </div>
+        </div>
+
+        <!-- Navigation Subtabs Row -->
+        <div class="admin-tabs-row" style="display:flex; gap:8px; overflow-x:auto; padding-bottom:6px; margin-bottom:16px;">
+          <button id="btn-admin-tab-users" class="btn-primary btn-filter active" onclick="switchAdminTab('users')">👥 Personas & Usuarios</button>
+          <button id="btn-admin-tab-obligations" class="btn-secondary btn-filter" onclick="switchAdminTab('obligations')">📋 Deberes Padres</button>
+          <button id="btn-admin-tab-badges" class="btn-secondary btn-filter" onclick="switchAdminTab('badges')">🎖️ Logros & Reconocimientos</button>
+          <button id="btn-admin-tab-passes" class="btn-secondary btn-filter" onclick="switchAdminTab('passes')">🎟️ Canjes</button>
+          <button id="btn-admin-tab-tardies" class="btn-secondary btn-filter" onclick="switchAdminTab('tardies')">⏰ Asistencia & Retardos</button>
+          <button id="btn-admin-tab-penalties" class="btn-secondary btn-filter" onclick="switchAdminTab('penalties')">🚨 Multas & Sanciones</button>
+          <button id="btn-admin-tab-grades" class="btn-secondary btn-filter" onclick="switchAdminTab('grades')">📝 Calificaciones</button>
+        </div>
+
+        <!-- SUBTAB 1: USERS & PEOPLE MANAGEMENT -->
+        <div id="admin-subtab-users" class="cards-column">
+          <!-- Filter & Search Toolbar -->
+          <div class="clay-card" style="padding:14px;">
+            <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center; justify-content:space-between;">
+              <div style="flex:1; min-width:240px;">
+                <input type="text" id="admin-user-search-input" class="form-input" placeholder="🔍 Buscar por nombre, correo, grado o código..." oninput="handleAdminUserSearch(this.value)">
+              </div>
+              <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                <button class="btn-primary btn-sm admin-role-filter active" data-role="ALL" onclick="filterAdminUserRole('ALL')">Todos</button>
+                <button class="btn-secondary btn-sm admin-role-filter" data-role="STUDENT" onclick="filterAdminUserRole('STUDENT')">🎓 Alumnos</button>
+                <button class="btn-secondary btn-sm admin-role-filter" data-role="TEACHER" onclick="filterAdminUserRole('TEACHER')">👨‍🏫 Docentes</button>
+                <button class="btn-secondary btn-sm admin-role-filter" data-role="PARENT" onclick="filterAdminUserRole('PARENT')">👨‍👩‍👧 Acudientes</button>
+                <button class="btn-primary btn-sm" style="background:#059669;" onclick="openModal('modal-add-user')">+ Agregar</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Dynamic User List Container -->
+          <div id="admin-users-list" class="cards-column" style="gap:10px;">
+            <!-- Populated dynamically by JS -->
+          </div>
+        </div>
+
+        <!-- SUBTAB: PARENT OBLIGATIONS & PENSIONES -->
+        <div id="admin-subtab-obligations" class="cards-column hidden">
+          <div class="clay-card" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+            <div>
+              <h4 style="margin:0; font-size:15px; font-weight:800; color:#059669;">📋 Deberes, Pensiones & Recordatorios para Padres</h4>
+              <p style="margin:2px 0 0 0; font-size:11px; color:var(--text-muted);">Asigna obligaciones mensuales con recordatorios automáticos estilo WhatsApp a las 2:00 PM y recompensas en créditos Escolaris para los hijos.</p>
+            </div>
+            <button class="btn-primary btn-sm" style="background:#059669;" onclick="openModal('modal-add-obligation')">📋 + Asignar Deber / Pensión</button>
+          </div>
+          <div id="admin-obligations-list" class="cards-column" style="gap:10px;">
+            <!-- Populated by JS -->
+          </div>
+        </div>
+
+        <!-- SUBTAB 2: BADGES & MERITS (Approval & Direct Grant) -->
+        <div id="admin-subtab-badges" class="cards-column hidden">
+          <!-- Pending Badge Requests (Approval Queue) -->
+          <div class="clay-card">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <div>
+                <strong>📥 Solicitudes de Logros por Aprobar</strong>
+                <p style="font-size:11px; color:var(--text-muted); margin-top:2px;">Revisa y aprueba reconocimientos solicitados por familias o estudiantes</p>
+              </div>
+              <button class="btn-primary btn-sm" onclick="openModal('modal-grant-badge')">+ Otorgar Directo 🎖️</button>
+            </div>
+            <div id="admin-pending-badges-list" class="cards-column" style="margin-top:12px; gap:8px;">
+              <!-- Populated by JS -->
+            </div>
+          </div>
+
+          <!-- Granted Badges History -->
+          <div class="clay-card">
+            <strong>🎖️ Historial de Logros Otorgados</strong>
+            <p style="font-size:11px; color:var(--text-muted); margin-top:2px;">Condecoraciones activas en la institución con opción de revocar si es necesario.</p>
+            <div id="admin-badges-list" class="cards-column" style="margin-top:12px; gap:8px;"></div>
+          </div>
+        </div>
+
+        <!-- SUBTAB 3: CANJES (Store Vouchers & Approvals) -->
+        <div id="admin-subtab-passes" class="cards-column hidden">
+          <div class="clay-card">
+            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+              <div>
+                <strong style="font-size:15px; color:var(--text-main);">🎟️ Solicitudes y Revisión de Canjes</strong>
+                <p style="font-size:11.5px; color:var(--text-muted); margin-top:3px;">
+                  Revisa las solicitudes de canje de los estudiantes. Al <strong>Aceptar</strong> se descuentan definitivamente los puntos; al <strong>Rechazar</strong> se devuelven al saldo del estudiante.
+                </p>
+              </div>
+              <input type="text" id="admin-pass-search-input" class="form-input" placeholder="🔍 Buscar estudiante o código..." style="max-width:220px;" oninput="handleAdminPassSearch(this.value)">
+            </div>
+          </div>
+          <div id="admin-passes-list" class="cards-column"></div>
+        </div>
+
+        <!-- SUBTAB 4: TARDIES & ATTENDANCE -->
+        <div id="admin-subtab-tardies" class="cards-column hidden">
+          <div class="clay-card">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <div>
+                <strong>Control de Llegadas Tarde & Asistencia</strong>
+                <p style="font-size:11px; color:var(--text-muted); margin-top:2px;">Registra y justifica retardos de los estudiantes.</p>
+              </div>
+              <button class="btn-primary btn-sm" onclick="openModal('modal-register-tardy')">+ Registrar Retardo</button>
+            </div>
+          </div>
+          <div id="admin-tardies-list" class="cards-column"></div>
+        </div>
+
+        <!-- SUBTAB 6: DISCIPLINARY PENALTIES & FINES -->
+        <div id="admin-subtab-penalties" class="cards-column hidden">
+          <div class="clay-card" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+            <div>
+              <h4 style="margin:0; font-size:15px; font-weight:800; color:var(--danger);">🚨 Control y Auditoría de Multas Disciplinarias</h4>
+              <p style="margin:2px 0 0 0; font-size:11px; color:var(--text-muted);">Sanciona faltas, descuenta créditos automáticamente y notifica al acudiente al instante.</p>
+            </div>
+            <button class="btn-danger btn-sm" onclick="openModal('modal-add-penalty')">🚨 + Aplicar Multa</button>
+          </div>
+          <div id="admin-penalties-list" class="cards-column"></div>
+        </div>
+
+        <!-- SUBTAB 5: GRADES -->
+        <div id="admin-subtab-grades" class="cards-column hidden">
+          <div class="clay-card">
+            <strong>Calificación de Evaluaciones (1.0 a 5.0)</strong>
+            <p style="font-size:11px; color:var(--text-muted); margin-top:2px;">Asigna notas a los talleres y exámenes entregados.</p>
+          </div>
+          <div id="admin-exams-grade-list" class="cards-column"></div>
+        </div>
+      </div>
+
+      <!-- VIEW 3: PARENT DASHBOARD (Portal Acudientes) -->
+      <div id="view-parent-dashboard" class="view-container tab-view hidden">
+        <!-- Parent Hero Card -->
+        <div class="clay-card parent-hero-card" style="margin-bottom:16px;">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+            <div>
+              <div style="font-size:11px; font-weight:800; color:#7c3aed; text-transform:uppercase;">Portal del Acudiente</div>
+              <h3 id="parent-student-name" style="font-size:20px; font-weight:800; margin-top:2px;">Cargando hijo/a...</h3>
+              <p id="parent-student-grade" style="font-size:13px; color:var(--text-muted);">Estudiante enlazado</p>
+            </div>
+            <button class="btn-primary btn-sm" style="background:#7c3aed;" onclick="openModal('modal-link-child')">🔗 Vincular Hijo/a</button>
+          </div>
+          
+          <div style="display:flex; gap:8px; margin-top:14px;">
+            <button class="btn-secondary btn-sm" onclick="openModal('modal-transfer-parent-points')">🪙 Ceder Puntos a mi Hijo/a</button>
+          </div>
+        </div>
+
+        <!-- Parent Subtabs Header -->
+        <div class="admin-tabs-row" style="margin-bottom:16px;">
+          <button id="btn-parent-subtab-pending" class="btn-primary btn-filter active" onclick="switchParentSubtab('pending')">
+            ⏳ Pendientes <span id="parent-badge-pending-count" class="badge" style="background:#EF4444; color:#ffffff; font-size:10px; font-weight:900; margin-left:4px; padding:1px 6px; border-radius:10px;">1</span>
+          </button>
+          <button id="btn-parent-subtab-completed" class="btn-secondary btn-filter" onclick="switchParentSubtab('completed')">
+            ✅ Al Día & Logros
+          </button>
+          <button id="btn-parent-subtab-academic" class="btn-secondary btn-filter" onclick="switchParentSubtab('academic')">
+            📊 Avance Académico
+          </button>
+        </div>
+
+        <!-- SUBTAB 0: ⏳ PENDIENTES & WHATSAPP REMINDER -->
+        <div id="parent-subtab-pending">
+          <!-- WhatsApp-Style Pension Reminder Card (Días 1 al 5 a las 2:00 PM) -->
+          <div id="parent-whatsapp-pension-card" class="whatsapp-pension-card hidden">
+            <div class="whatsapp-header-bar">
+              <div style="display:flex; align-items:center; gap:10px;">
+                <div class="whatsapp-avatar-badge">🏫</div>
+                <div>
+                  <div style="display:flex; align-items:center; gap:6px;">
+                    <strong style="font-size:13px; color:#ffffff;">Colegio Hogar Madre de Dios</strong>
+                    <span style="font-size:10px; background:#10B981; color:white; padding:1px 6px; border-radius:10px; font-weight:800;">OFICIAL</span>
+                  </div>
+                  <div style="font-size:10px; color:#D1FAE5; opacity:0.9;">Notificación Oficial de Pensiones • 2:00 PM</div>
+                </div>
+              </div>
+              <button type="button" class="btn-sm" onclick="shareWhatsAppPension()" style="background:#25D366; color:white; border:none; border-radius:6px; font-weight:800; font-size:11px; padding:4px 10px; cursor:pointer;">
+                📲 Abrir Chat
+              </button>
+            </div>
+            <div class="whatsapp-message-bubble">
+              <p id="parent-whatsapp-message-text" style="margin:0; font-size:12.5px; color:#1e293b; line-height:1.5;">
+                <!-- Dynamically populated -->
+              </p>
+              <div style="text-align:right; font-size:10px; color:#64748b; margin-top:4px;">
+                2:00 PM • Enviado por Administración Escolar ✓✓
+              </div>
+            </div>
+          </div>
+
+          <!-- Quick Actions & CTA -->
+          <div class="clay-card" style="margin-bottom:16px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+            <div>
+              <h4 style="margin:0; font-weight:800; font-size:15px; color:var(--text-main);">📋 Deberes & Pensiones Mensuales</h4>
+              <p style="margin:2px 0 0 0; font-size:11px; color:var(--text-muted);">Cumple a tiempo para recompensar a tu hijo/a con créditos y desbloquear logros familiares.</p>
+            </div>
+            <button class="btn-primary btn-sm" style="background:#059669;" onclick="scrollToObligationsChecklist()">
+              Ver Deberes ↓
+            </button>
+          </div>
+
+          <!-- Progress Overview Card -->
+          <div class="clay-card" style="margin-bottom:16px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+              <span id="parent-obligations-progress-text" style="font-size:12px; font-weight:800; color:var(--text-main);">0 de 0 deberes cumplidos este mes</span>
+              <span id="parent-obligations-percent-pill" class="badge" style="background:rgba(37,99,235,0.15); color:var(--primary); font-weight:900;">0%</span>
+            </div>
+            <div class="xp-bar-bg" style="height:10px; border-radius:5px;">
+              <div id="parent-obligations-progress-bar" class="xp-bar-fill" style="width:0%; background:linear-gradient(90deg, #10B981, #059669);"></div>
+            </div>
+          </div>
+
+          <!-- Pending Obligations List -->
+          <div id="parent-obligations-section">
+            <div id="parent-obligations-list" class="cards-column" style="gap:10px;"></div>
+          </div>
+        </div>
+
+        <!-- SUBTAB 1: ✅ CUMPLIDAS & LOGROS FAMILIARES -->
+        <div id="parent-subtab-completed" class="hidden">
+          <div class="clay-card" style="margin-bottom:16px;">
+            <div style="display:flex; align-items:center; gap:8px; margin-bottom:12px;">
+              <span style="font-size:22px;">✅</span>
+              <h4 style="margin:0; font-weight:800; font-size:15px;">Historial de Deberes Cumplidos</h4>
+            </div>
+            <div id="parent-completed-obligations-list" class="cards-column" style="gap:8px;"></div>
+          </div>
+
+          <div class="clay-card" style="margin-bottom:16px;">
+            <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
+              <span style="font-size:22px;">🎖️</span>
+              <div>
+                <h4 style="margin:0; font-weight:800; font-size:15px;">Logros Familiares Compartidos</h4>
+                <p style="font-size:11px; color:var(--text-muted); margin:2px 0 0 0;">Reconocimientos ganados por asistencia, puntualidad y apoyo escolar</p>
+              </div>
+            </div>
+            <div id="parent-family-badges-list" class="cards-column" style="margin-top:10px;"></div>
+          </div>
+        </div>
+
+        <!-- SUBTAB 2: 📊 AVANCE ACADÉMICO -->
+        <div id="parent-subtab-academic" class="hidden">
+          <!-- Disciplinary Penalties Alert for Parents -->
+          <div id="parent-penalties-section" class="clay-card hidden" style="border:1.5px solid var(--danger); background:rgba(239, 68, 68, 0.06); margin-bottom:16px;">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span style="font-size:20px;">🚨</span>
+              <div>
+                <h4 style="margin:0; font-size:14px; font-weight:800; color:var(--danger);">Reportes Disciplinarios & Sanciones</h4>
+                <p style="margin:2px 0 0 0; font-size:11px; color:var(--text-muted);">Notificaciones de faltas registradas por los docentes titulares:</p>
+              </div>
+            </div>
+            <div id="parent-penalties-list" class="cards-column" style="margin-top:10px;"></div>
+          </div>
+
+          <div class="desktop-grid-2col">
+            <!-- Left Column: Tardies -->
+            <div class="cards-column">
+              <div class="clay-card">
+                <strong>⏰ Control de Asistencia & Puntualidad</strong>
+                <div id="parent-tardies-list" class="cards-column" style="margin-top:10px;"></div>
+              </div>
+            </div>
+
+            <!-- Right Column: Tasks & Exams -->
+            <div class="cards-column">
+              <div class="clay-card">
+                <strong>📝 Tareas & Evaluaciones del Hijo/a</strong>
+                <div id="parent-tasks-list" class="cards-column" style="margin-top:10px;"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- VIEW 4: TASKS & EXAMS (Tareas & Evaluaciones) -->
+      <div id="view-tasks" class="view-container tab-view hidden">
+        <div class="section-header-row">
+          <h2 class="section-title">Tareas y Evaluaciones</h2>
+          <button id="btn-add-task-header" class="btn-primary btn-sm" onclick="openModal('modal-task')">+ Nueva Tarea</button>
+        </div>
+
+        <div class="filter-tabs-row" style="margin-bottom:14px;">
+          <button id="task-filter-pending" class="btn-primary btn-filter active" onclick="filterTasks('pending')">Pendientes</button>
+          <button id="task-filter-completed" class="btn-secondary btn-filter" onclick="filterTasks('completed')">Completadas</button>
+          <button id="task-filter-exams" class="btn-secondary btn-filter" onclick="filterTasks('exams')">Exámenes</button>
+        </div>
+
+        <div id="tasks-list" class="cards-column">
+          <!-- Dynamic tasks list -->
+        </div>
+      </div>
+
+      <!-- VIEW: CALENDAR (Sección Dedicada: Calendario Completo) -->
+      <div id="view-calendar" class="view-container tab-view hidden">
+        <div class="section-header-row">
+          <h2 class="section-title">Calendario</h2>
+        </div>
+
+        <div class="clay-card" style="margin-bottom:14px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+            <div>
+              <h4 style="margin:0; font-size:16px; font-weight:800; color:var(--text-main);">📅 Calendario General & Actividades</h4>
+              <p style="margin:4px 0 0 0; font-size:12px; color:var(--text-muted);">
+                Cronograma anual oficial, evaluaciones, tareas por fecha, Jean Days y reuniones escolares.
+              </p>
+            </div>
+            <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+              <div class="calendar-view-toggle">
+                <button id="btn-cal-view-month" class="calendar-view-btn active" onclick="switchCalendarView('month')">
+                  <span>📅</span> <span>Mes</span>
+                </button>
+                <button id="btn-cal-view-list" class="calendar-view-btn" onclick="switchCalendarView('list')">
+                  <span>📋</span> <span>Cronograma</span>
+                </button>
+              </div>
+              <button class="btn-primary btn-sm" onclick="openAddSchoolEventModal()">➕ Agregar Evento</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- CONTAINER 1: MONTHLY INTERACTIVE CALENDAR -->
+        <div id="calendar-monthly-container">
+          <div class="calendar-card">
+            <!-- Month Navigation Header -->
+            <div class="calendar-header-nav">
+              <div class="cal-month-title-wrap">
+                <button class="cal-nav-btn" onclick="calendarPrevMonth()" title="Mes anterior">‹</button>
+                <h3 id="cal-current-month-label" class="cal-month-title">Septiembre 2026</h3>
+                <button class="cal-nav-btn" onclick="calendarNextMonth()" title="Mes siguiente">›</button>
+                <button class="cal-today-btn" onclick="calendarGoToToday()" title="Ir al día de hoy">📅 Hoy</button>
+              </div>
+              
+              <div style="display:flex; align-items:center; gap:8px;">
+                <select id="cal-quick-month-select" class="form-select" style="font-size:12px; padding:4px 8px; width:auto;" onchange="handleCalendarMonthSelectChange(this.value)">
+                  <option value="0">Enero</option>
+                  <option value="1">Febrero</option>
+                  <option value="2">Marzo</option>
+                  <option value="3">Abril</option>
+                  <option value="4">Mayo</option>
+                  <option value="5">Junio</option>
+                  <option value="6">Julio</option>
+                  <option value="7">Agosto</option>
+                  <option value="8" selected>Septiembre</option>
+                  <option value="9">Octubre</option>
+                  <option value="10">Noviembre</option>
+                  <option value="11">Diciembre</option>
+                </select>
+                <select id="cal-quick-year-select" class="form-select" style="font-size:12px; padding:4px 8px; width:auto;" onchange="handleCalendarYearSelectChange(this.value)">
+                  <option value="2025">2025</option>
+                  <option value="2026" selected>2026</option>
+                  <option value="2027">2027</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Days of week headers -->
+            <div class="calendar-weekdays-row">
+              <div class="calendar-weekday-header">LUN</div>
+              <div class="calendar-weekday-header">MAR</div>
+              <div class="calendar-weekday-header">MIÉ</div>
+              <div class="calendar-weekday-header">JUE</div>
+              <div class="calendar-weekday-header">VIE</div>
+              <div class="calendar-weekday-header">SÁB</div>
+              <div class="calendar-weekday-header">DOM</div>
+            </div>
+
+            <!-- Days Grid (Rendered dynamically) -->
+            <div id="calendar-days-grid" class="calendar-days-grid"></div>
+
+            <!-- Legend -->
+            <div class="calendar-legend">
+              <div class="legend-item">
+                <span class="cal-dot cal-dot-event"></span>
+                <span>Eventos Institucionales</span>
+              </div>
+              <div class="legend-item">
+                <span class="cal-dot cal-dot-exam"></span>
+                <span>Exámenes</span>
+              </div>
+              <div class="legend-item">
+                <span class="cal-dot cal-dot-task"></span>
+                <span>Tareas / Entregas</span>
+              </div>
+              <div class="legend-item">
+                <span style="display:inline-block; width:12px; height:12px; border:2px solid var(--primary); border-radius:50%;"></span>
+                <span>Día de Hoy</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Selected Day Agenda -->
+          <div id="calendar-day-agenda" class="clay-card calendar-day-agenda">
+            <!-- Dynamically rendered day activities -->
+          </div>
+        </div>
+
+        <!-- CONTAINER 2: ANNUAL LIST VIEW -->
+        <div id="calendar-list-container" class="hidden">
+          <div class="clay-card" style="margin-bottom:14px;">
+            <div style="display:flex; gap:8px;">
+              <input type="text" id="input-search-events" class="form-input" placeholder="🔍 Buscar por nombre de evento, fecha, tipo o lugar..." oninput="filterCalendarQuery()" style="width:100%;">
+            </div>
+
+            <!-- Month Quick Filter Pills (All 12 Months) -->
+            <div class="admin-tabs-row" style="margin-top:12px; gap:5px; overflow-x:auto; padding-bottom:4px;">
+              <button id="btn-cal-month-TODOS" class="btn-primary btn-filter active" style="font-size:11px; padding:4px 10px;" onclick="filterCalendarMonth('TODOS')">Todos</button>
+              <button id="btn-cal-month-Enero" class="btn-secondary btn-filter" style="font-size:11px; padding:4px 10px;" onclick="filterCalendarMonth('Enero')">Ene</button>
+              <button id="btn-cal-month-Febrero" class="btn-secondary btn-filter" style="font-size:11px; padding:4px 10px;" onclick="filterCalendarMonth('Febrero')">Feb</button>
+              <button id="btn-cal-month-Marzo" class="btn-secondary btn-filter" style="font-size:11px; padding:4px 10px;" onclick="filterCalendarMonth('Marzo')">Mar</button>
+              <button id="btn-cal-month-Abril" class="btn-secondary btn-filter" style="font-size:11px; padding:4px 10px;" onclick="filterCalendarMonth('Abril')">Abr</button>
+              <button id="btn-cal-month-Mayo" class="btn-secondary btn-filter" style="font-size:11px; padding:4px 10px;" onclick="filterCalendarMonth('Mayo')">May</button>
+              <button id="btn-cal-month-Junio" class="btn-secondary btn-filter" style="font-size:11px; padding:4px 10px;" onclick="filterCalendarMonth('Junio')">Jun</button>
+              <button id="btn-cal-month-Julio" class="btn-secondary btn-filter" style="font-size:11px; padding:4px 10px;" onclick="filterCalendarMonth('Julio')">Jul</button>
+              <button id="btn-cal-month-Agosto" class="btn-secondary btn-filter" style="font-size:11px; padding:4px 10px;" onclick="filterCalendarMonth('Agosto')">Ago</button>
+              <button id="btn-cal-month-Septiembre" class="btn-secondary btn-filter" style="font-size:11px; padding:4px 10px;" onclick="filterCalendarMonth('Septiembre')">Sep</button>
+              <button id="btn-cal-month-Octubre" class="btn-secondary btn-filter" style="font-size:11px; padding:4px 10px;" onclick="filterCalendarMonth('Octubre')">Oct</button>
+              <button id="btn-cal-month-Noviembre" class="btn-secondary btn-filter" style="font-size:11px; padding:4px 10px;" onclick="filterCalendarMonth('Noviembre')">Nov</button>
+              <button id="btn-cal-month-Diciembre" class="btn-secondary btn-filter" style="font-size:11px; padding:4px 10px;" onclick="filterCalendarMonth('Diciembre')">Dic</button>
+            </div>
+          </div>
+
+          <div id="school-events-list" class="cards-column" style="gap:10px;">
+            <!-- Rendered dynamically -->
+          </div>
+        </div>
+      </div>
+
+      <!-- VIEW 5: SCHEDULE (Horario de Clases & Directorio Institucional) -->
+      <div id="view-schedule" class="view-container tab-view hidden">
+        <div class="section-header-row">
+          <h2 class="section-title">Horario de Clases</h2>
+        </div>
+
+        <!-- Schedule Subtabs -->
+        <div class="admin-tabs-row" style="margin-bottom:16px;">
+          <button id="btn-sched-tab-classes" class="btn-primary btn-filter active" onclick="switchScheduleSubtab('classes')">
+            ⏰ Horario de Clases
+          </button>
+          <button id="btn-sched-tab-directory" class="btn-secondary btn-filter" onclick="switchScheduleSubtab('directory')">
+            📞 Directorio & Atención a Padres
+          </button>
+        </div>
+
+        <!-- SUBTAB 1: HORARIO DE CLASES -->
+        <div id="schedule-view-classes">
+          <div class="clay-card">
+            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:12px;">
+              <div>
+                <h4 style="margin:0; font-size:15px; font-weight:800; color:var(--text-main);">📅 Horario de Clases Semanal</h4>
+                <p style="margin:2px 0 0 0; font-size:11.5px; color:var(--text-muted);">Gestiona los bloques de clase y descansos de la jornada escolar.</p>
+              </div>
+              <div style="display:flex; gap:6px; align-items:center;">
+                <span class="badge" style="background:rgba(37,99,235,0.1); color:var(--primary); font-weight:800; font-size:11px;">Jornada: 7:00 AM - 1:20 PM</span>
+                <button class="btn-secondary btn-sm" onclick="downloadScheduleWeb()" title="Descargar / Imprimir Horario Oficial">📥 Descargar Horario</button>
+                <button id="btn-add-class-slot" class="btn-primary btn-sm" onclick="openAddClassSlotModal()">➕ Agregar Bloque</button>
+              </div>
+            </div>
+
+            <div class="admin-tabs-row" style="margin-bottom:14px;">
+              <button id="btn-sched-day-Lunes" class="btn-primary btn-filter active" onclick="filterScheduleDay('Lunes')">Lunes</button>
+              <button id="btn-sched-day-Martes" class="btn-secondary btn-filter" onclick="filterScheduleDay('Martes')">Martes</button>
+              <button id="btn-sched-day-Miércoles" class="btn-secondary btn-filter" onclick="filterScheduleDay('Miércoles')">Miércoles</button>
+              <button id="btn-sched-day-Jueves" class="btn-secondary btn-filter" onclick="filterScheduleDay('Jueves')">Jueves</button>
+              <button id="btn-sched-day-Viernes" class="btn-secondary btn-filter" onclick="filterScheduleDay('Viernes')">Viernes</button>
+            </div>
+            
+            <div id="schedule-classes-list" class="cards-column" style="gap:8px;"></div>
+          </div>
+        </div>
+
+        <!-- SUBTAB 3: DIRECTORIO DOCENTE & ATENCIÓN A PADRES -->
+        <div id="schedule-view-directory" class="hidden">
+          <div class="clay-card" style="margin-bottom:14px;">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:10px;">
+              <div>
+                <h4 style="margin:0; font-size:15px; font-weight:800; color:var(--text-main);">🏫 Directorio de Docentes & Horarios de Atención</h4>
+                <p style="margin:4px 0 0 0; font-size:12px; color:var(--text-muted);">
+                  Consulta la materia, correo institucional y horario de atención presencial. Toca cualquier correo o botón para abrir Gmail automáticamente.
+                </p>
+              </div>
+              <button id="btn-add-teacher" class="btn-primary btn-sm" onclick="openAddTeacherModal()">➕ Agregar Docente</button>
+            </div>
+
+            <div style="margin-top:12px; display:flex; gap:8px;">
+              <input type="text" id="input-search-teacher" class="form-input" placeholder="🔍 Buscar por docente, materia o cargo..." oninput="filterTeacherDirectory()" style="width:100%;">
+            </div>
+          </div>
+
+          <div id="teacher-directory-list" class="cards-column" style="gap:10px;">
+            <!-- Rendered dynamically -->
+          </div>
+        </div>
+      </div>
+
+      <!-- VIEW: JOURNAL (Mi Bitácora & Diario Escolar) -->
+      <div id="view-journal" class="view-container tab-view hidden">
+        <div class="section-header-row">
+          <h2 class="section-title">Mi Bitácora Escolar</h2>
+        </div>
+
+        <!-- Inspiration & Daily Prompt Banner -->
+        <div class="journal-welcome-card clay-card">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:12px;">
+            <div style="flex:1; min-width:240px;">
+              <h4 class="journal-welcome-title">
+                <span>📖</span>
+                <span>Diario de Aprendizaje & Vivencias</span>
+              </h4>
+              <p class="journal-welcome-prompt">
+                Registra tus logros, cómo te sentiste, lo que aprendiste hoy y los recuerdos especiales de tu jornada escolar.
+              </p>
+            </div>
+            <button class="btn-primary btn-sm" onclick="openNewJournalModal()" style="white-space:nowrap;">
+              ✍️ Nueva Entrada
+            </button>
+          </div>
+        </div>
+
+        <!-- Search & Mood Filters -->
+        <div class="clay-card" style="margin-bottom:14px; padding:12px 14px;">
+          <div style="display:flex; gap:8px; margin-bottom:10px;">
+            <input type="text" id="input-search-journal" class="form-input" placeholder="🔍 Buscar en mis bitácoras por título, texto o materia..." oninput="filterJournalQuery()">
+          </div>
+
+          <div class="journal-filter-pills" id="journal-mood-filters">
+            <button class="btn-primary btn-filter active btn-sm" onclick="filterJournalMood('TODOS')" id="btn-journal-mood-TODOS">Todas ✨</button>
+            <button class="btn-secondary btn-filter btn-sm" onclick="filterJournalMood('INSPIRADA')" id="btn-journal-mood-INSPIRADA">🌟 Inspirada</button>
+            <button class="btn-secondary btn-filter btn-sm" onclick="filterJournalMood('FELIZ')" id="btn-journal-mood-FELIZ">😊 Feliz</button>
+            <button class="btn-secondary btn-filter btn-sm" onclick="filterJournalMood('CREATIVA')" id="btn-journal-mood-CREATIVA">💡 Creativa</button>
+            <button class="btn-secondary btn-filter btn-sm" onclick="filterJournalMood('TRANQUILA')" id="btn-journal-mood-TRANQUILA">🧘 Tranquila</button>
+            <button class="btn-secondary btn-filter btn-sm" onclick="filterJournalMood('ENFOCADA')" id="btn-journal-mood-ENFOCADA">📚 Enfocada</button>
+            <button class="btn-secondary btn-filter btn-sm" onclick="filterJournalMood('CANSADA')" id="btn-journal-mood-CANSADA">🥱 Cansada</button>
+          </div>
+        </div>
+
+        <!-- Entries Timeline / Cards List -->
+        <div id="journal-entries-list" class="cards-column" style="gap:12px;">
+          <!-- Dynamically rendered -->
+        </div>
+      </div>
+
+      <!-- VIEW 6: REWARDS STORE (Tienda Escolaris) -->
+      <div id="view-rewards" class="view-container tab-view hidden">
+        <div class="clay-card balance-card" style="margin-bottom:14px;">
+          <div class="balance-header-row">
+            <div>
+              <div class="balance-label">Tu Saldo en Escolaris</div>
+              <div id="store-balance-text" class="balance-amount">🪙 0</div>
+            </div>
+            <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+              <button id="btn-create-reward-header" class="btn-primary btn-sm hidden" onclick="openModal('modal-create-reward')">+ Nueva Recompensa 🎁</button>
+              <button class="btn-secondary btn-sm" onclick="switchStoreTab('passes')">Mis Pases 🎟️</button>
+              <button id="btn-store-catalog-tab" class="btn-secondary btn-sm hidden" onclick="switchStoreTab('catalog')">Catálogo 🎁</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Store Category Filter Bar (Chips horizontales organizados sin scroll) -->
+        <div id="store-categories-bar" class="store-filter-bar">
+          <button id="btn-store-cat-ALL" class="settings-subtab-chip active" onclick="filterRewardsCategory('ALL')">
+            <span>🌟</span> Todos
+          </button>
+          <button id="btn-store-cat-AULA" class="settings-subtab-chip" onclick="filterRewardsCategory('AULA')">
+            <span>🪑</span> Aula & Clases
+          </button>
+          <button id="btn-store-cat-ACADEMICO" class="settings-subtab-chip" onclick="filterRewardsCategory('ACADEMICO')">
+            <span>📚</span> Académicos
+          </button>
+          <button id="btn-store-cat-RECREO" class="settings-subtab-chip" onclick="filterRewardsCategory('RECREO')">
+            <span>⚽</span> Recreo
+          </button>
+          <button id="btn-store-cat-CAFETERIA" class="settings-subtab-chip" onclick="filterRewardsCategory('CAFETERIA')">
+            <span>🥪</span> Cafetería
+          </button>
+          <button id="btn-store-cat-DISTINCION" class="settings-subtab-chip" onclick="filterRewardsCategory('DISTINCION')">
+            <span>🏆</span> Distinciones
+          </button>
+        </div>
+
+        <div id="rewards-tab-catalog" class="rewards-grid">
+          <!-- Dynamic rewards catalog -->
+        </div>
+
+        <div id="rewards-tab-passes" class="cards-column hidden">
+          <!-- Dynamic passes list -->
+        </div>
+      </div>
+
+      <!-- VIEW 7: GAMIFICATION & RANKING (Tabla de Honor) -->
+      <div id="view-gamification" class="view-container tab-view hidden">
+        <!-- Hero Rank Card (Interactivo para explorar rangos escolares) -->
+        <div class="clay-card hero-rank-card" style="margin-bottom:18px;" onclick="openStudentRanksModal()" title="Toca aquí para ver todos los Rangos Escolares 🏆">
+          <div class="rank-header-row">
+            <div id="hero-rank-title" class="rank-title">Explorador Escolar 🎒</div>
+            <div id="hero-level-badge" class="level-tag">Nivel 1</div>
+          </div>
+          <div class="xp-progress-meta">
+            <span>Progreso de Nivel:</span>
+            <span id="hero-xp-text" class="xp-amount">0 / 300 XP</span>
+          </div>
+          <div class="progress-bar-bg">
+            <div id="hero-xp-bar" class="progress-bar-fill" style="width: 0%;"></div>
+          </div>
+          <div style="font-size:11px; color:var(--primary); font-weight:800; margin-top:8px; text-align:right;">
+            Toca para ver todos los rangos escolares ➔
+          </div>
+        </div>
+
+        <h3 class="section-subtitle">🏆 Tabla de Honor Institucional</h3>
+        <div id="leaderboard-list" class="cards-column">
+          <!-- Dynamic leaderboard -->
+        </div>
+      </div>
+
+      <!-- VIEW 8: PROFILE & SETTINGS (Perfil & Ajustes) -->
+      <div id="view-profile" class="view-container tab-view hidden">
+        <div class="desktop-grid-2col">
+          <!-- Left Column: Hero Profile & Badges -->
+          <div class="cards-column">
+            <div class="clay-card profile-hero-card">
+              <div class="profile-avatar-box" onclick="document.getElementById('profile-photo-input').click()" title="Toca para subir una foto de perfil">
+                <div id="profile-avatar-content" style="width:100%; height:100%; display:flex; align-items:center; justify-content:center;">
+                  <span id="profile-avatar-emoji">🎓</span>
+                </div>
+                <div class="avatar-camera-badge">📷</div>
+              </div>
+              <input type="file" id="profile-photo-input" accept="image/*" style="display:none;" onchange="handleProfilePhotoUpload(event)">
+              
+              <div class="profile-details">
+                <div class="profile-name-row">
+                  <span id="profile-name" class="profile-name">Cargando...</span>
+                  <button class="btn-edit-sm" onclick="openOnboardingModal(true)">Editar Rol</button>
+                </div>
+                <div id="profile-grade" class="profile-role-grade">🎓 Estudiante • 10° Grado</div>
+                <div id="profile-bio" class="profile-bio">Estudiante activo en Escolaris 🚀</div>
+                
+                <div style="display:flex; gap:6px; margin: 4px 0 6px 0;">
+                  <button class="btn-primary btn-sm" style="font-size:11px; padding:3px 8px;" onclick="document.getElementById('profile-photo-input').click()">📷 Cambiar Foto</button>
+                  <button id="btn-remove-photo" class="btn-secondary btn-sm hidden" style="font-size:11px; padding:3px 8px;" onclick="handleRemoveProfilePhoto()">✕ Quitar Foto</button>
+                </div>
+
+                <div class="profile-chips-row">
+                  <div class="stat-pill coin chip-sm"><span id="profile-coins-chip">🪙 0</span></div>
+                  <div class="stat-pill streak chip-sm"><span id="profile-streak-chip">🔥 0 días</span></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Badges & Store Showcase Card (Con pestaña de Tienda para Estudiantes) -->
+            <div class="clay-card">
+              <div class="profile-subtabs-row">
+                <button id="btn-profile-subtab-badges" class="settings-subtab-chip active" onclick="switchProfileSubtab('badges')">
+                  <span>🎖️</span> Mis Logros
+                </button>
+                <button id="btn-profile-subtab-store" class="settings-subtab-chip" onclick="switchProfileSubtab('store')">
+                  <span>🎟️</span> Canjes
+                </button>
+              </div>
+
+              <!-- SUBTAB 1: LOGROS ESCOLARES -->
+              <div id="profile-subtab-content-badges">
+                <h4 class="card-title-primary" style="margin-top:0;">
+                  <span>🎖️</span> Mis Logros & Reconocimientos
+                </h4>
+                <div id="profile-badges-list" class="cards-column" style="margin-top:10px;"></div>
+              </div>
+
+              <!-- SUBTAB 2: TIENDA ESCOLAR & MIS CANJES -->
+              <div id="profile-subtab-content-store" class="hidden">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                  <h4 class="card-title-primary" style="margin:0;">
+                    <span>🎁</span> Recompensas por Desbloquear
+                  </h4>
+                  <span id="profile-store-balance-badge" class="badge" style="background:#fef3c7; color:#b45309; font-weight:800; font-size:12px;">🪙 0</span>
+                </div>
+                <p style="font-size:11.5px; color:var(--text-muted); margin-bottom:10px;">
+                  Usa tus monedas para canjear beneficios escolares en el aula.
+                </p>
+                
+                <div id="profile-store-catalog-container" class="cards-column" style="gap:8px; margin-bottom:16px;">
+                  <!-- Dynamically rendered available rewards -->
+                </div>
+
+                <h4 class="card-title-primary" style="margin-top:16px; margin-bottom:6px;">
+                  <span>🎟️</span> Mis Compras & Canjes Realizados
+                </h4>
+                <p style="font-size:11.5px; color:var(--text-muted); margin-bottom:10px;">
+                  Pases que has solicitado con su estado de validación.
+                </p>
+                <div id="profile-store-purchases-container" class="cards-column" style="gap:8px;">
+                  <!-- Dynamically rendered student passes & redemptions -->
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Right Column: Codes, Classroom & Settings (Con Subpestañas Deslizables) -->
+          <div class="cards-column">
+            
+            <!-- Sliding Navigation Pills for Settings (Sin Scroll Excesivo) -->
+            <div class="settings-subtabs-row">
+              <button id="btn-settings-tab-codes" class="settings-subtab-chip active" onclick="switchSettingsSubtab('codes')">
+                <span>🔑</span> Códigos & Aula
+              </button>
+              <button id="btn-settings-tab-visual" class="settings-subtab-chip" onclick="switchSettingsSubtab('visual')">
+                <span>🎨</span> Aspecto Visual
+              </button>
+              <button id="btn-settings-tab-account" class="settings-subtab-chip" onclick="switchSettingsSubtab('account')">
+                <span>⚙️</span> Mi Cuenta
+              </button>
+            </div>
+
+            <!-- SECTION 1: CÓDIGOS & VINCULACIÓN -->
+            <div id="settings-section-codes" class="cards-column" style="gap:10px;">
+              <!-- TEACHER CLASS CODE CARD (For Teachers) -->
+              <div class="clay-card hidden" id="card-teacher-code-box">
+                <h4 class="card-title-primary">
+                  <span>🏫</span> Código Único de tu Clase (Docente)
+                </h4>
+                <p class="card-description">
+                  Comparte este código con los alumnos de tu aula para que se vinculen a tu clase y reciban tareas.
+                </p>
+                <div class="code-box">
+                  <div>
+                    <div class="code-label">CÓDIGO DE CLASE</div>
+                    <div id="teacher-code-text" class="code-value">DOC-100201</div>
+                  </div>
+                  <button class="btn-primary btn-sm" onclick="copyTeacherCode()">Copiar 📋</button>
+                </div>
+              </div>
+
+              <!-- STUDENT CODE CARD (For Students) -->
+              <div class="clay-card" id="card-student-code-box">
+                <h4 class="card-title-primary">
+                  <span>🔑</span> Código Único de Vinculación Familiar
+                </h4>
+                <p class="card-description">
+                  Comparte este código con tus padres para vincular sus cuentas y ver tus avances escolares.
+                </p>
+                <div class="code-box">
+                  <div>
+                    <div class="code-label">CÓDIGO ÚNICO</div>
+                    <div id="student-code-text" class="code-value">ESC-100201</div>
+                  </div>
+                  <button class="btn-primary btn-sm" onclick="copyStudentCode()">Copiar 📋</button>
+                </div>
+              </div>
+
+              <!-- STUDENT TEACHER CLASSROOM LINK CARD (For Students) -->
+              <div class="clay-card" id="card-student-classroom-box">
+                <h4 class="card-title-primary">
+                  <span>🏫</span> Mi Aula / Docente Titular
+                </h4>
+                <p class="card-description">
+                  Ingresa el código que te dio tu profesor para unirte a su aula y recibir sus tareas.
+                </p>
+                <div id="student-classroom-status">
+                  <!-- Dynamically filled by JS -->
+                </div>
+              </div>
+            </div>
+
+            <!-- SECTION 2: ASPECTO VISUAL -->
+            <div id="settings-section-visual" class="cards-column hidden" style="gap:10px;">
+              <div class="clay-card">
+                <h4 class="card-title-simple">🎨 Tema & Apariencia</h4>
+                <p style="font-size:12px; color:var(--text-muted); margin:4px 0 12px 0;">
+                  Personaliza cómo visualizas la plataforma en tu dispositivo móvil o navegador.
+                </p>
+                <button class="btn-secondary menu-btn" onclick="toggleDarkMode()">🌓 Alternar Modo Claro / Oscuro</button>
+              </div>
+            </div>
+
+            <!-- SECTION 3: MI CUENTA -->
+            <div id="settings-section-account" class="cards-column hidden" style="gap:10px;">
+              <div class="clay-card menu-card">
+                <h4 class="card-title-simple">⚙️ Gestión de Cuenta & Seguridad</h4>
+                <p style="font-size:12px; color:var(--text-muted); margin:4px 0 12px 0;">
+                  Actualiza tus datos escolares o cierra tu sesión de forma segura.
+                </p>
+                <button class="btn-secondary menu-btn" onclick="openOnboardingModal(true)">✏️ Configurar Rol y Datos</button>
+                <button class="btn-secondary menu-btn btn-danger-outline" onclick="handleSignOut()">🚪 Cerrar Sesión</button>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Floating Bottom Navigation Bar (Mobile only) -->
+    <nav class="bottom-nav-bar" id="dynamic-bottom-nav">
+      <!-- Generated by JS according to Role -->
+    </nav>
+  </div>
+
+  <!-- ONBOARDING SETUP PROFILE MODAL (Questions & Role Configuration) -->
+  <div id="modal-onboarding" class="modal-backdrop">
+    <div class="modal-card">
+      <div style="text-align:center; margin-bottom:8px;">
+        <div style="font-size:36px;">🚀</div>
+        <h3 class="modal-title" style="font-size:18px;">Configura tu Cuenta en Escolaris</h3>
+        <p style="font-size:12px; color:var(--text-muted);">Completa tus datos para personalizar tu experiencia escolar.</p>
+      </div>
+
+      <form onsubmit="handleSaveOnboarding(event)" class="modal-form">
+        <div class="form-group">
+          <label class="form-label">Nombres y Apellidos</label>
+          <input type="text" id="onboard-name" class="form-input" placeholder="Tu nombre completo" required>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">¿Cuál es tu rol en la institución?</label>
+          <div class="role-picker-grid">
+            <div class="role-card selected" id="onboard-role-student" onclick="selectOnboardRole('STUDENT')">
+              <div class="role-card-icon">🎓</div>
+              <div class="role-card-title">Estudiante</div>
+              <div class="role-card-desc">Tareas y logros</div>
+            </div>
+            <div class="role-card" id="onboard-role-teacher" onclick="selectOnboardRole('TEACHER')">
+              <div class="role-card-icon">👨‍🏫</div>
+              <div class="role-card-title">Docente</div>
+              <div class="role-card-desc">Gestión y notas</div>
+            </div>
+            <div class="role-card" id="onboard-role-parent" onclick="selectOnboardRole('PARENT')">
+              <div class="role-card-icon">👨‍👩‍👧</div>
+              <div class="role-card-title">Acudiente</div>
+              <div class="role-card-desc">Seguimiento</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Onboard Role: Student -->
+        <div class="form-group" id="onboard-group-student">
+          <label class="form-label">Grado Escolar</label>
+          <select id="onboard-grade" class="form-select">
+            <option value="10° Grado">10° Grado</option>
+            <option value="11° Grado">11° Grado</option>
+            <option value="9° Grado">9° Grado</option>
+            <option value="8° Grado">8° Grado</option>
+            <option value="7° Grado">7° Grado</option>
+            <option value="6° Grado">6° Grado</option>
+          </select>
+        </div>
+
+        <!-- Onboard Role: Teacher -->
+        <div class="form-group hidden" id="onboard-group-teacher">
+          <label class="form-label">Materia o Especialidad</label>
+          <input type="text" id="onboard-teacher-subject" class="form-input" placeholder="Ej: Matemáticas, Ciencias, Titular...">
+        </div>
+
+        <!-- Onboard Role: Parent -->
+        <div class="form-group hidden" id="onboard-group-parent">
+          <label class="form-label">Código del Estudiante (Hijo/a)</label>
+          <input type="text" id="onboard-child-code" class="form-input" placeholder="Ej: ESC-XXXXXX (o déjalo en blanco)">
+        </div>
+
+        <!-- Avatar Emoji Grid -->
+        <div class="form-group">
+          <label class="form-label">Elige tu Avatar</label>
+          <div class="avatar-emoji-grid">
+            <button type="button" class="avatar-emoji-btn selected" onclick="selectOnboardAvatar('🎓')">🎓</button>
+            <button type="button" class="avatar-emoji-btn" onclick="selectOnboardAvatar('👨‍🏫')">👨‍🏫</button>
+            <button type="button" class="avatar-emoji-btn" onclick="selectOnboardAvatar('👩‍🏫')">👩‍🏫</button>
+            <button type="button" class="avatar-emoji-btn" onclick="selectOnboardAvatar('👨‍👩‍👧')">👨‍👩‍👧</button>
+            <button type="button" class="avatar-emoji-btn" onclick="selectOnboardAvatar('🚀')">🚀</button>
+            <button type="button" class="avatar-emoji-btn" onclick="selectOnboardAvatar('🧪')">🧪</button>
+            <button type="button" class="avatar-emoji-btn" onclick="selectOnboardAvatar('🎨')">🎨</button>
+            <button type="button" class="avatar-emoji-btn" onclick="selectOnboardAvatar('⭐')">⭐</button>
+            <button type="button" class="avatar-emoji-btn" onclick="selectOnboardAvatar('💡')">💡</button>
+            <button type="button" class="avatar-emoji-btn" onclick="selectOnboardAvatar('🦁')">🦁</button>
+          </div>
+        </div>
+
+        <button type="submit" class="btn-primary submit-btn mt-3">Guardar y Entrar a Escolaris 🚀</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: ADD USER (Admin) -->
+  <div id="modal-add-user" class="modal-backdrop">
+    <div class="modal-card">
+      <h3 class="modal-title">Agregar Nueva Persona</h3>
+      <p style="font-size:12px; color:var(--text-muted); margin-bottom:12px;">Crea una cuenta para un estudiante, docente o acudiente.</p>
+      <form onsubmit="handleCreateUser(event)" class="modal-form">
+        <div class="form-group">
+          <label class="form-label">Nombre Completo</label>
+          <input type="text" id="add-user-name" class="form-input" placeholder="Ej: Camilo Andrés Morales" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Correo Electrónico</label>
+          <input type="email" id="add-user-email" class="form-input" placeholder="ejemplo@colegio.edu.co" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Rol Institucional</label>
+          <select id="add-user-role" class="form-select" onchange="toggleAddUserRoleFields(this.value)">
+            <option value="STUDENT" selected>🎓 Estudiante</option>
+            <option value="TEACHER">👨‍🏫 Docente Titular</option>
+            <option value="PARENT">👨‍👩‍👧 Acudiente / Padre</option>
+          </select>
+        </div>
+        <div class="form-group" id="add-user-grade-group">
+          <label class="form-label">Grado Escolar</label>
+          <select id="add-user-grade" class="form-select">
+            <option value="6° Grado">6° Grado</option>
+            <option value="7° Grado">7° Grado</option>
+            <option value="8° Grado">8° Grado</option>
+            <option value="9° Grado">9° Grado</option>
+            <option value="10° Grado" selected>10° Grado</option>
+            <option value="11° Grado">11° Grado</option>
+          </select>
+        </div>
+        <div class="form-group hidden" id="add-user-subject-group">
+          <label class="form-label">Materia o Asignatura</label>
+          <input type="text" id="add-user-subject" class="form-input" placeholder="Ej: Matemáticas & Física">
+        </div>
+        <div class="form-group hidden" id="add-user-childcode-group">
+          <label class="form-label">Código de Hijo/a a Vincular</label>
+          <input type="text" id="add-user-childcode" class="form-input" placeholder="ESC-XXXXXX" style="text-transform:uppercase;">
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+          <div class="form-group">
+            <label class="form-label">Créditos Iniciales 🪙</label>
+            <input type="number" id="add-user-credits" class="form-input" value="100" min="0">
+          </div>
+          <div class="form-group">
+            <label class="form-label">XP Inicial ⚡</label>
+            <input type="number" id="add-user-xp" class="form-input" value="50" min="0">
+          </div>
+        </div>
+        <div class="modal-actions-row">
+          <button type="button" class="btn-secondary flex-1" onclick="closeModal('modal-add-user')">Cancelar</button>
+          <button type="submit" class="btn-primary flex-1" style="background:#059669;">Guardar Persona 👤</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: EDIT USER (Admin) -->
+  <div id="modal-edit-user" class="modal-backdrop">
+    <div class="modal-card">
+      <h3 class="modal-title">Editar Datos de Usuario</h3>
+      <form onsubmit="handleUpdateUser(event)" class="modal-form">
+        <input type="hidden" id="edit-user-id">
+        <div class="form-group">
+          <label class="form-label">Nombre Completo</label>
+          <input type="text" id="edit-user-name" class="form-input" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Correo Electrónico</label>
+          <input type="email" id="edit-user-email" class="form-input" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Rol Institucional</label>
+          <select id="edit-user-role" class="form-select" onchange="toggleEditUserRoleFields(this.value)">
+            <option value="STUDENT">🎓 Estudiante</option>
+            <option value="TEACHER">👨‍🏫 Docente</option>
+            <option value="PARENT">👨‍👩‍👧 Acudiente</option>
+          </select>
+        </div>
+        <div class="form-group" id="edit-user-grade-group">
+          <label class="form-label">Grado / Sección</label>
+          <input type="text" id="edit-user-grade" class="form-input" placeholder="Ej: 10° Grado">
+        </div>
+        <div class="form-group" id="edit-user-subject-group">
+          <label class="form-label">Materia Docente</label>
+          <input type="text" id="edit-user-subject" class="form-input" placeholder="Ej: Matemáticas">
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+          <div class="form-group">
+            <label class="form-label">Créditos 🪙</label>
+            <input type="number" id="edit-user-credits" class="form-input" min="0">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Puntos XP ⚡</label>
+            <input type="number" id="edit-user-xp" class="form-input" min="0">
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Código Único (Inmutable)</label>
+          <input type="text" id="edit-user-code" class="form-input" style="font-family:monospace; text-transform:uppercase;">
+        </div>
+        <div class="modal-actions-row">
+          <button type="button" class="btn-secondary flex-1" onclick="closeModal('modal-edit-user')">Cancelar</button>
+          <button type="submit" class="btn-primary flex-1">Guardar Cambios 💾</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: ADJUST USER POINTS (Admin) -->
+  <div id="modal-adjust-points" class="modal-backdrop">
+    <div class="modal-card">
+      <h3 class="modal-title">Ajustar Créditos & XP</h3>
+      <p id="adjust-points-user-label" style="font-size:12px; color:var(--text-muted); margin-bottom:12px;">Usuario: ...</p>
+      <form onsubmit="handleSaveAdjustPoints(event)" class="modal-form">
+        <input type="hidden" id="adjust-points-user-id">
+        <div class="form-group">
+          <label class="form-label">Acción</label>
+          <select id="adjust-points-action" class="form-select">
+            <option value="ADD">➕ Otorgar Créditos</option>
+            <option value="SUB">➖ Deducir Créditos</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Cantidad de Créditos 🪙</label>
+          <input type="number" id="adjust-points-amount" class="form-input" value="50" min="1" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Motivo u Observación</label>
+          <input type="text" id="adjust-points-reason" class="form-input" placeholder="Ej: Participación en concurso de ciencias" required>
+        </div>
+        <div class="modal-actions-row">
+          <button type="button" class="btn-secondary flex-1" onclick="closeModal('modal-adjust-points')">Cancelar</button>
+          <button type="submit" class="btn-primary flex-1" style="background:var(--coin-gold);">Aplicar Ajuste 🪙</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: ADD PENALTY / MULTA DISCIPLINARIA (Teacher) -->
+  <div id="modal-add-penalty" class="modal-backdrop">
+    <div class="modal-card">
+      <div style="text-align:center; margin-bottom:10px;">
+        <div style="font-size:32px;">🚨</div>
+        <h3 class="modal-title" style="color:var(--danger);">Aplicar Sanción / Multa Disciplinaria</h3>
+        <p style="font-size:12px; color:var(--text-muted);">Deduce créditos del estudiante y notifica inmediatamente al acudiente.</p>
+      </div>
+
+      <form onsubmit="handleCreatePenalty(event)" class="modal-form">
+        <div class="form-group">
+          <label class="form-label">Estudiante a Sancionar</label>
+          <select id="penalty-student-select" class="form-select" required></select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Infracción / Falta Frecuente</label>
+          <div class="penalty-presets-grid">
+            <button type="button" class="preset-fine-btn selected" onclick="selectPenaltyPreset('Uso indebido de celular en clase', 30, this)">
+              <span>📱 Celular en clase</span>
+              <span class="fine-pts">-30 🪙</span>
+            </button>
+            <button type="button" class="preset-fine-btn" onclick="selectPenaltyPreset('Indisciplina / Falta de respeto', 50, this)">
+              <span>⚠️ Indisciplina / Respeto</span>
+              <span class="fine-pts">-50 🪙</span>
+            </button>
+            <button type="button" class="preset-fine-btn" onclick="selectPenaltyPreset('No portar el uniforme institucional', 15, this)">
+              <span>👕 Uniforme inadecuado</span>
+              <span class="fine-pts">-15 🪙</span>
+            </button>
+            <button type="button" class="preset-fine-btn" onclick="selectPenaltyPreset('Incumplimiento de tareas / deberes', 20, this)">
+              <span>📝 Tareas sin entregar</span>
+              <span class="fine-pts">-20 🪙</span>
+            </button>
+            <button type="button" class="preset-fine-btn" onclick="selectPenaltyPreset('Daño o mal uso de mobiliario / aulas', 100, this)">
+              <span>🏫 Daño a instalaciones</span>
+              <span class="fine-pts">-100 🪙</span>
+            </button>
+            <button type="button" class="preset-fine-btn" onclick="selectPenaltyPreset('Retardo reincidente a clase', 10, this)">
+              <span>⏰ Retardo reiterado</span>
+              <span class="fine-pts">-10 🪙</span>
+            </button>
+            <button type="button" class="preset-fine-btn" onclick="selectPenaltyPreset('Otra falta disciplinaria', 25, this)">
+              <span>✏️ Otra falta</span>
+              <span class="fine-pts">-25 🪙</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Motivo de la Falta</label>
+          <input type="text" id="penalty-reason-input" class="form-input" value="Uso indebido de celular en clase" required>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Puntos a Deducir (🪙 Escolaris)</label>
+          <input type="number" id="penalty-points-input" class="form-input" value="30" min="1" required>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Observación del Docente (Visible para los Padres)</label>
+          <textarea id="penalty-observation-input" class="form-textarea" rows="2" placeholder="Ej: Se le llamó la atención en clase..."></textarea>
+        </div>
+
+        <div class="form-group" style="display:flex; align-items:center; gap:8px;">
+          <input type="checkbox" id="penalty-notify-parents" checked style="width:16px; height:16px; cursor:pointer;">
+          <label for="penalty-notify-parents" style="font-size:12px; font-weight:700; color:var(--text-main); cursor:pointer;">Notificar a los padres de familia inmediatamente 📢</label>
+        </div>
+
+        <div class="modal-actions-row">
+          <button type="button" class="btn-secondary flex-1" onclick="closeModal('modal-add-penalty')">Cancelar</button>
+          <button type="submit" class="btn-primary flex-1" style="background:var(--danger);">Aplicar Sanción 🚨</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: GRANT BADGE (Teacher) -->
+  <div id="modal-grant-badge" class="modal-backdrop">
+    <div class="modal-card">
+      <h3 class="modal-title">Otorgar Reconocimiento o Logro</h3>
+      <form onsubmit="handleGrantBadge(event)" class="modal-form">
+        <div class="form-group">
+          <label class="form-label">Tipo de Reconocimiento</label>
+          <div class="role-picker-grid" style="grid-template-columns: 1fr 1fr;">
+            <div class="role-card selected" id="badge-type-family" onclick="selectBadgeType('FAMILY')">
+              <div class="role-card-icon">👨‍👩‍👧</div>
+              <div class="role-card-title">Logro Familiar</div>
+              <div class="role-card-desc">Padres & Alumno</div>
+            </div>
+            <div class="role-card" id="badge-type-student" onclick="selectBadgeType('HONOR')">
+              <div class="role-card-icon">🎓</div>
+              <div class="role-card-title">Estudiante</div>
+              <div class="role-card-desc">Mérito escolar</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Estudiante Galardonado</label>
+          <select id="badge-student-select" class="form-select"></select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Logro a Otorgar</label>
+          <select id="badge-preset-select" class="form-select"></select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Mensaje o Motivo de Felicitación</label>
+          <textarea id="badge-note" class="form-textarea" rows="2" placeholder="¡Felicitaciones por tu esfuerzo y compromiso escolar ejemplar!"></textarea>
+        </div>
+
+        <div class="modal-actions-row">
+          <button type="button" class="btn-secondary flex-1" onclick="closeModal('modal-grant-badge')">Cancelar</button>
+          <button type="submit" class="btn-primary flex-1">Otorgar Logro 🎖️</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: REGISTER TARDY (Teacher) -->
+  <div id="modal-register-tardy" class="modal-backdrop">
+    <div class="modal-card">
+      <h3 class="modal-title">Registrar Llegada Tarde</h3>
+      <form onsubmit="handleRegisterTardy(event)" class="modal-form">
+        <div class="form-group">
+          <label class="form-label">Estudiante</label>
+          <select id="tardy-student-select" class="form-select"></select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Materia</label>
+          <input type="text" id="tardy-subject" class="form-input" placeholder="Ej: Matemáticas" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Minutos de Retraso</label>
+          <input type="number" id="tardy-delay" class="form-input" value="15" min="1" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Motivo u Observación</label>
+          <input type="text" id="tardy-reason" class="form-input" placeholder="Ej: Tráfico matutino / Sin justificación">
+        </div>
+        <div class="modal-actions-row">
+          <button type="button" class="btn-secondary flex-1" onclick="closeModal('modal-register-tardy')">Cancelar</button>
+          <button type="submit" class="btn-primary flex-1">Registrar ⏰</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: LINK CHILD (Parent) -->
+  <div id="modal-link-child" class="modal-backdrop">
+    <div class="modal-card">
+      <h3 class="modal-title">Vincular Código del Hijo/a</h3>
+      <p style="font-size:12px; color:var(--text-muted);">Ingresa el código del perfil de tu hijo/a para vincular su cuenta.</p>
+      <form onsubmit="handleLinkChild(event)" class="modal-form">
+        <div class="form-group">
+          <label class="form-label">Código Único</label>
+          <input type="text" id="link-child-input-code" class="form-input" placeholder="ESC-XXXXXX" required style="text-transform:uppercase;">
+        </div>
+        <div class="modal-actions-row">
+          <button type="button" class="btn-secondary flex-1" onclick="closeModal('modal-link-child')">Cancelar</button>
+          <button type="submit" class="btn-primary flex-1">Vincular Cuenta 👨‍👩‍👧</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: TRANSFER POINTS (Parent) -->
+  <div id="modal-transfer-parent-points" class="modal-backdrop">
+    <div class="modal-card">
+      <h3 class="modal-title">Ceder Puntos de Incentivo a tu Hijo/a</h3>
+      <form onsubmit="handleTransferParentPoints(event)" class="modal-form">
+        <div class="form-group">
+          <label class="form-label">Cantidad de Puntos</label>
+          <select id="transfer-points-amount" class="form-select">
+            <option value="25">+25 Créditos 🪙</option>
+            <option value="50" selected>+50 Créditos 🪙</option>
+            <option value="100">+100 Créditos 🪙</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Motivo del Reconocimiento</label>
+          <input type="text" id="transfer-points-reason" class="form-input" placeholder="Ej: Cumplimiento excelente de deberes en casa" required>
+        </div>
+        <div class="modal-actions-row">
+          <button type="button" class="btn-secondary flex-1" onclick="closeModal('modal-transfer-parent-points')">Cancelar</button>
+          <button type="submit" class="btn-primary flex-1" style="background:var(--coin-gold);">Transferir 🪙</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: ADD TASK -->
+  <div id="modal-task" class="modal-backdrop">
+    <div class="modal-card">
+      <h3 class="modal-title">Nueva Actividad Escolar</h3>
+      <form onsubmit="handleCreateTask(event)" class="modal-form">
+        <div class="form-group">
+          <label class="form-label">Tipo de Actividad</label>
+          <select id="task-type" class="form-select">
+            <option value="TASK">📝 Tarea / Taller Escolar</option>
+            <option value="EXAM">🎯 Evaluación / Examen</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Título</label>
+          <input type="text" id="task-title" class="form-input" placeholder="Ej: Taller de Álgebra pág 45" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Materia</label>
+          <select id="task-subject" class="form-select">
+            <option value="Dirección de grupo">👨‍🏫 Dirección de grupo</option>
+            <option value="Sistemas">💻 Sistemas</option>
+            <option value="Biología">🔬 Biología</option>
+            <option value="Inglés">🇬🇧 Inglés</option>
+            <option value="Sociales">🌍 Sociales</option>
+            <option value="Español">📖 Español</option>
+            <option value="Geometría">📐 Geometría</option>
+            <option value="Matemáticas">➕ Matemáticas</option>
+            <option value="Estética">🎨 Estética</option>
+            <option value="Música">🎵 Música</option>
+            <option value="Cátedra emocional">💛 Cátedra emocional</option>
+            <option value="Física">⚡ Física</option>
+            <option value="Educación Física">⚽ Educación Física</option>
+            <option value="Ética">🤝 Ética</option>
+            <option value="Química">🧪 Química</option>
+            <option value="Religión">🕊️ Religión</option>
+            <option value="Razonamiento Matemático">🧠 Razonamiento Matemático</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Fecha de Entrega / Realización</label>
+          <input type="date" id="task-due-date" class="form-input" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Prioridad</label>
+          <select id="task-priority" class="form-select">
+            <option value="ALTA">Alta</option>
+            <option value="MEDIA" selected>Media</option>
+            <option value="BAJA">Baja</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Instrucciones o Detalles</label>
+          <textarea id="task-desc" class="form-textarea" rows="2" placeholder="Opcional..."></textarea>
+        </div>
+        <div class="modal-actions-row">
+          <button type="button" class="btn-secondary flex-1" onclick="closeModal('modal-task')">Cancelar</button>
+          <button type="submit" class="btn-primary flex-1">Guardar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: CREATE POST -->
+  <div id="modal-post" class="modal-backdrop">
+    <div class="modal-card">
+      <h3 class="modal-title">Publicar en el Muro</h3>
+      <form onsubmit="handleCreatePost(event)" class="modal-form">
+        <div class="form-group">
+          <label class="form-label">Categoría</label>
+          <select id="post-category" class="form-select">
+            <option value="GENERAL">📢 Comunicado / Aviso General</option>
+            <option value="LATE_HELP">🚨 Auxilio de Apuntes (¿Faltaste a clase?)</option>
+            <option value="STUDY">📚 Grupo de Estudio</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Materia de la Clase (Opcional)</label>
+          <select id="post-subject" class="form-select">
+            <option value="">-- General (Sin materia específica) --</option>
+            <option value="Dirección de grupo">👨‍🏫 Dirección de grupo</option>
+            <option value="Sistemas">💻 Sistemas</option>
+            <option value="Biología">🔬 Biología</option>
+            <option value="Inglés">🇬🇧 Inglés</option>
+            <option value="Sociales">🌍 Sociales</option>
+            <option value="Español">📖 Español</option>
+            <option value="Geometría">📐 Geometría</option>
+            <option value="Matemáticas">➕ Matemáticas</option>
+            <option value="Estética">🎨 Estética</option>
+            <option value="Música">🎵 Música</option>
+            <option value="Cátedra emocional">💛 Cátedra emocional</option>
+            <option value="Física">⚡ Física</option>
+            <option value="Educación Física">⚽ Educación Física</option>
+            <option value="Ética">🤝 Ética</option>
+            <option value="Química">🧪 Química</option>
+            <option value="Religión">🕊️ Religión</option>
+            <option value="Razonamiento Matemático">🧠 Razonamiento Matemático</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Mensaje</label>
+          <textarea id="post-content" class="form-textarea" rows="3" placeholder="Escribe tu consulta, aviso o comparte apuntes..." required></textarea>
+        </div>
+        <div class="modal-actions-row">
+          <button type="button" class="btn-secondary flex-1" onclick="closeModal('modal-post')">Cancelar</button>
+          <button type="submit" class="btn-primary flex-1">Publicar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: ADD PARENT OBLIGATION (Teacher/Admin) -->
+  <div id="modal-add-obligation" class="modal-backdrop">
+    <div class="modal-card">
+      <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;">
+        <div style="width:36px; height:36px; border-radius:50%; background:#dcf8c6; display:flex; align-items:center; justify-content:center; font-size:18px;">📋</div>
+        <div>
+          <h3 class="modal-title" style="margin:0;">Nuevo Deber / Pensión Familiar</h3>
+          <p style="font-size:11px; color:var(--text-muted); margin:2px 0 0 0;">Asigna obligaciones con recordatorios estilo WhatsApp a las 2:00 PM</p>
+        </div>
+      </div>
+
+      <form onsubmit="handleCreateObligation(event)" class="modal-form">
+        <div class="form-group">
+          <label class="form-label">Plantillas Rápidas</label>
+          <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:6px;">
+            <button type="button" class="btn-secondary btn-sm preset-obl-btn active" onclick="applyObligationPreset('PENSION')">💳 Pensión</button>
+            <button type="button" class="btn-secondary btn-sm preset-obl-btn" onclick="applyObligationPreset('DOCUMENTATION')">📄 Circular</button>
+            <button type="button" class="btn-secondary btn-sm preset-obl-btn" onclick="applyObligationPreset('EVENT')">🏛️ Asamblea</button>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Título</label>
+          <input type="text" id="obl-title" class="form-input" value="Pago Oportuno de Pensión Escolar" required>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Descripción</label>
+          <textarea id="obl-desc" class="form-textarea" rows="2" required>Pago de la pensión escolar correspondiente al mes de Octubre durante los primeros 5 días.</textarea>
+        </div>
+
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+          <div class="form-group">
+            <label class="form-label">Mes</label>
+            <input type="text" id="obl-month" class="form-input" value="Octubre" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Día Límite (Ej: 5)</label>
+            <input type="number" id="obl-due-day" class="form-input" value="5" min="1" max="31" required>
+          </div>
+        </div>
+
+        <div style="display:grid; grid-template-columns:2fr 1fr; gap:8px;">
+          <div class="form-group">
+            <label class="form-label">Nombre Insignia Reconocimiento</label>
+            <input type="text" id="obl-badge-title" class="form-input" value="Pago Oportuno de Pensión (Octubre)" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Emoji</label>
+            <input type="text" id="obl-badge-emoji" class="form-input" value="💳" required>
+          </div>
+        </div>
+
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+          <div class="form-group">
+            <label class="form-label">Créditos para el Hijo/a 🪙</label>
+            <input type="number" id="obl-credits" class="form-input" value="100" min="0" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Puntos XP para el Hijo/a ⚡</label>
+            <input type="number" id="obl-xp" class="form-input" value="150" min="0" required>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Mensaje WhatsApp Programado (2:00 PM)</label>
+          <textarea id="obl-whatsapp-msg" class="form-textarea" rows="3" required>¡Hola estimado acudiente! 👋 Les recordamos que a partir de octubre la pensión se paga los 5 primeros días del mes. ¡Paga a tiempo para ganar la insignia de Pago Oportuno y +100 créditos Escolaris para tu hijo/a! ⭐</textarea>
+        </div>
+
+        <input type="hidden" id="obl-category" value="PENSION">
+        <input type="hidden" id="obl-badge-key" value="PARENT_PENSION_OCTUBRE">
+
+        <div class="modal-actions-row">
+          <button type="button" class="btn-secondary flex-1" onclick="closeModal('modal-add-obligation')">Cancelar</button>
+          <button type="submit" class="btn-primary flex-1" style="background:#059669;">Guardar Deber 📋</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: CREATE REWARD (Teacher/Admin) -->
+  <div id="modal-create-reward" class="modal-backdrop">
+    <div class="modal-card">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+        <h3 class="modal-title" style="margin:0;">🎁 Nueva Recompensa Escolar</h3>
+        <button class="btn-icon" onclick="closeModal('modal-create-reward')">✕</button>
+      </div>
+      <form id="form-create-reward" onsubmit="handleCreateReward(event)">
+        <div class="form-group">
+          <label class="form-label">Nombre de la Recompensa</label>
+          <input type="text" id="create-reward-title" class="form-input" placeholder="Ej: Prórroga de Tarea (+24h)" required>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Descripción o Reglas de Uso</label>
+          <textarea id="create-reward-desc" class="form-textarea" rows="2" placeholder="Describe los beneficios y condiciones para canjear este beneficio..."></textarea>
+        </div>
+
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+          <div class="form-group">
+            <label class="form-label">Valor (🪙 Escolaris)</label>
+            <input type="number" id="create-reward-cost" class="form-input" value="120" min="5" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Stock Disponible</label>
+            <input type="number" id="create-reward-stock" class="form-input" value="15" min="1" required>
+          </div>
+        </div>
+
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+          <div class="form-group">
+            <label class="form-label">Emoji / Icono</label>
+            <input type="text" id="create-reward-icon" class="form-input" value="🎁" maxlength="4" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Categoría</label>
+            <select id="create-reward-category" class="form-select">
+              <option value="AULA">🪑 Aula & Clases</option>
+              <option value="ACADEMICO" selected>📚 Académicos</option>
+              <option value="RECREO">⚽ Recreo & Juegos</option>
+              <option value="CAFETERIA">🥪 Cafetería</option>
+              <option value="DISTINCION">🏆 Distinciones</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="modal-actions-row">
+          <button type="button" class="btn-secondary flex-1" onclick="closeModal('modal-create-reward')">Cancelar</button>
+          <button type="submit" class="btn-primary flex-1">Publicar Recompensa 🚀</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: EDIT REWARD (Teacher/Admin - Nombre, Descripción, Valor) -->
+  <div id="modal-edit-reward" class="modal-backdrop">
+    <div class="modal-card">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span style="font-size:22px;">✏️</span>
+          <h3 class="modal-title" style="margin:0;">Editar Recompensa</h3>
+        </div>
+        <button class="btn-icon" onclick="closeModal('modal-edit-reward')">✕</button>
+      </div>
+      <form id="form-edit-reward" onsubmit="handleUpdateReward(event)">
+        <input type="hidden" id="edit-reward-id" value="">
+
+        <div class="form-group">
+          <label class="form-label">Nombre de la Recompensa</label>
+          <input type="text" id="edit-reward-title" class="form-input" placeholder="Nombre visible en la tienda" required>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Descripción / Términos</label>
+          <textarea id="edit-reward-desc" class="form-textarea" rows="3" placeholder="Describe los términos y cómo se valida con el docente..."></textarea>
+        </div>
+
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+          <div class="form-group">
+            <label class="form-label">Valor (🪙 Escolaris)</label>
+            <input type="number" id="edit-reward-cost" class="form-input" min="5" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Stock Disponible</label>
+            <input type="number" id="edit-reward-stock" class="form-input" min="0" required>
+          </div>
+        </div>
+
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+          <div class="form-group">
+            <label class="form-label">Emoji / Icono</label>
+            <input type="text" id="edit-reward-icon" class="form-input" maxlength="4" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Categoría</label>
+            <select id="edit-reward-category" class="form-select">
+              <option value="AULA">🪑 Aula & Clases</option>
+              <option value="ACADEMICO">📚 Académicos</option>
+              <option value="RECREO">⚽ Recreo & Juegos</option>
+              <option value="CAFETERIA">🥪 Cafetería</option>
+              <option value="DISTINCION">🏆 Distinciones</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="modal-actions-row">
+          <button type="button" class="btn-secondary flex-1" onclick="closeModal('modal-edit-reward')">Cancelar</button>
+          <button type="submit" class="btn-primary flex-1">Guardar Cambios 💾</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: CONFIRM COMPLETE OBLIGATION (Parent) -->
+  <div id="modal-confirm-obligation" class="modal-backdrop">
+    <div class="modal-card">
+      <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
+        <span id="confirm-obl-emoji" style="font-size:28px;">💳</span>
+        <h3 id="confirm-obl-title" class="modal-title" style="margin:0;">Completar Obligación</h3>
+      </div>
+      <p id="confirm-obl-desc" style="font-size:13px; color:var(--text-muted); margin-bottom:12px;">¿Confirmas que has realizado este deber o pago oportuno?</p>
+      
+      <div class="clay-card" style="background:#f0fdf4; border:1px solid #86efac; padding:12px; margin-bottom:14px;">
+        <div style="font-size:11px; font-weight:800; color:#166534; text-transform:uppercase;">🎁 Recompensas automáticas para tu hijo/a:</div>
+        <div id="confirm-obl-rewards-text" style="font-size:12px; color:#15803d; font-weight:700; margin-top:4px;">
+          • Medalla: Pago Oportuno 💳<br>
+          • +100 Créditos Escolaris 🪙<br>
+          • +150 XP ⚡
+        </div>
+      </div>
+
+      <input type="hidden" id="confirm-obl-id" value="">
+
+      <div class="modal-actions-row">
+        <button type="button" class="btn-secondary flex-1" onclick="closeModal('modal-confirm-obligation')">Cancelar</button>
+        <button type="button" class="btn-primary flex-1" style="background:#059669;" onclick="executeCompleteObligation()">Confirmar y Recibir Insignia ✅</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: CELEBRATION BADGE (Festive Modal) -->
+  <div id="modal-celebration-badge" class="modal-backdrop">
+    <div class="modal-card text-center" style="max-width:380px;">
+      <div id="celebration-badge-emoji" class="celebration-badge-box">💳</div>
+      <h3 style="font-size:20px; font-weight:900; color:var(--text-main); margin:0;">🎉 ¡Logro Desbloqueado!</h3>
+      <h4 id="celebration-badge-title" style="font-size:15px; font-weight:800; color:#b45309; margin:4px 0 10px 0;">Pago Oportuno de Pensión</h4>
+      
+      <p id="celebration-badge-desc" style="font-size:13px; color:var(--text-muted); line-height:1.45; margin-bottom:14px;">
+        ¡Felicitaciones! Has completado tu deber escolar oportunamente. Tu hijo/a ha recibido el logro en su perfil y créditos Escolaris para canjear en la tienda.
+      </p>
+
+      <button class="btn-primary w-full" style="background:var(--coin-gold); font-weight:900;" onclick="closeModal('modal-celebration-badge')">
+        ¡Excelente! Continuar 🚀
+      </button>
+    </div>
+  </div>
+
+  <!-- FLOATING WHATSAPP PUSH ALERT TOAST -->
+  <div id="whatsapp-live-alert" class="whatsapp-live-alert">
+    <div style="width:36px; height:36px; border-radius:50%; background:#25D366; display:flex; align-items:center; justify-content:center; color:#ffffff; font-size:18px; flex-shrink:0;">💬</div>
+    <div style="flex:1; min-width:0;">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <strong style="font-size:12px; color:#075E54;">Colegio Escolaris • Tesorería</strong>
+        <span style="font-size:10px; color:#65676B;">Ahora</span>
+      </div>
+      <div id="whatsapp-alert-text" style="font-size:11.5px; color:#1F2937; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Recordatorio de pensión escolar</div>
+    </div>
+    <button style="background:#25D366; color:#fff; border:none; border-radius:8px; padding:5px 9px; font-size:11px; font-weight:800; cursor:pointer;" onclick="handleWhatsAppLiveAlertClick()">Ver 📋</button>
+  </div>
+
+  <!-- MODAL: VIEW TEACHER DETAIL (ENLARGED) -->
+  <div id="modal-teacher-detail" class="modal-backdrop">
+    <div class="modal-card" style="text-align:center; max-width:420px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+        <span style="font-size:12px; font-weight:800; color:var(--text-muted);">DETALLE DEL DOCENTE</span>
+        <button type="button" class="btn-secondary btn-sm" onclick="closeModal('modal-teacher-detail')" style="border-radius:50%; width:28px; height:28px; padding:0; display:inline-flex; align-items:center; justify-content:center;">✕</button>
+      </div>
+
+      <div id="detail-teacher-avatar" style="font-size:44px; background:rgba(124,58,237,0.12); width:80px; height:80px; line-height:80px; border-radius:50%; margin:0 auto 10px auto; border:2px solid rgba(124,58,237,0.4);">👨‍🏫</div>
+      
+      <h3 id="detail-teacher-name" style="font-size:19px; font-weight:900; color:var(--text-main); margin:0 0 6px 0;">Docente</h3>
+      
+      <div>
+        <span id="detail-teacher-role" class="badge" style="background:#ede9fe; color:#6b21a8; font-weight:900; font-size:12px; padding:4px 12px;">Director de grado</span>
+      </div>
+
+      <!-- Tarjeta destacada: Materia(s) que dicta a 7° Grado (Solo si aplica) -->
+      <div id="detail-teacher-subjects-7th-box" style="margin-top:14px; text-align:left; background:#eff6ff; border-radius:12px; padding:12px; border:1.2px solid #93c5fd;">
+        <div style="font-size:11px; color:#1e40af; font-weight:800;">📖 Materia(s) que dicta a Grado 7°:</div>
+        <div id="detail-teacher-subjects-7th" style="font-size:14px; font-weight:800; color:#1d4ed8; margin-top:2px;">Materia en 7°</div>
+      </div>
+
+      <div style="margin-top:10px; text-align:left; background:rgba(0,0,0,0.03); border-radius:12px; padding:12px; border:1px solid rgba(0,0,0,0.06);">
+        <div style="font-size:11px; color:var(--text-muted); font-weight:700;">📚 Área General / Especialidad:</div>
+        <div id="detail-teacher-subject" style="font-size:13.5px; font-weight:800; color:var(--text-main); margin-top:2px;">Materia</div>
+      </div>
+
+      <div style="margin-top:10px; text-align:left; background:rgba(16,185,129,0.08); border-radius:12px; padding:12px; border:1px solid #86efac;">
+        <div style="font-size:11px; color:#166534; font-weight:800;">🗓️ Atención Presencial a Padres:</div>
+        <div id="detail-teacher-attention" style="font-size:13.5px; font-weight:800; color:#15803d; margin-top:2px;">Lunes (12:30 PM - 1:20 PM)</div>
+      </div>
+
+      <div id="detail-teacher-email-box" style="margin-top:10px; text-align:left; background:rgba(234,67,53,0.08); border-radius:12px; padding:12px; border:1px solid #fca5a5;">
+        <div style="font-size:11px; color:#991b1b; font-weight:800;">✉️ Correo Institucional:</div>
+        <div id="detail-teacher-email" style="font-size:13px; font-weight:800; color:#b91c1c; margin-top:2px; word-break:break-all;">correo@colegio.edu.co</div>
+        <div style="margin-top:10px; display:flex; gap:8px;">
+          <button id="detail-teacher-gmail-btn" type="button" class="btn-primary btn-sm flex-1" style="background:#EA4335;">✉️ Abrir en Gmail</button>
+          <button id="detail-teacher-copy-btn" type="button" class="btn-secondary btn-sm" onclick="copyDetailTeacherEmail()">📋 Copiar</button>
+        </div>
+      </div>
+
+      <div style="margin-top:16px;">
+        <button type="button" class="btn-primary w-100" style="background:#7c3aed; font-weight:800;" onclick="closeModal('modal-teacher-detail')">← Volver / Minimizar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: EDIT / ADD TEACHER -->
+  <div id="modal-edit-teacher" class="modal-backdrop">
+    <div class="modal-card">
+      <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;">
+        <span id="edit-teacher-avatar-preview" style="font-size:30px; background:#ede9fe; padding:6px 10px; border-radius:10px;">👨‍🏫</span>
+        <div>
+          <h3 id="edit-teacher-modal-title" class="modal-title" style="margin:0;">Editar Docente</h3>
+          <p style="font-size:11px; color:var(--text-muted); margin:2px 0 0 0;">Configura la información del directorio y horarios de atención</p>
+        </div>
+      </div>
+
+      <form onsubmit="handleSaveTeacher(event)" class="modal-form">
+        <input type="hidden" id="edit-teacher-index" value="-1">
+
+        <div class="form-group">
+          <label class="form-label">Nombre Completo del Docente / Directivo</label>
+          <input type="text" id="edit-teacher-name" class="form-input" placeholder="Ej: Manuel Alejandro Muñoz" required>
+        </div>
+
+        <div style="display:grid; grid-template-columns:1.5fr 1fr; gap:8px;">
+          <div class="form-group">
+            <label class="form-label">Cargo / Grado</label>
+            <input type="text" id="edit-teacher-role" class="form-input" placeholder="Ej: Director de grado 7°" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Icono Emoji</label>
+            <input type="text" id="edit-teacher-emoji" class="form-input" placeholder="👨‍🏫" value="👨‍🏫" maxlength="4" required>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Clase(s) que dicta a Grado 7° (Opcional)</label>
+          <input type="text" id="edit-teacher-subjects-7th" class="form-input" placeholder="Ej: Matemáticas y Sistemas (Dejar vacío si no dicta en 7°)">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Área General / Especialidad</label>
+          <input type="text" id="edit-teacher-subject" class="form-input" placeholder="Ej: Matemáticas, Sistemas" required>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Correo Institucional (Opcional)</label>
+          <input type="email" id="edit-teacher-email" class="form-input" placeholder="Ej: docente@colegiohogarmadrededios.edu.co (Dejar vacío si no tiene)">
+          <span style="font-size:10.5px; color:var(--text-muted); margin-top:2px; display:block;">Si se deja vacío, se indicará 'Atención presencial en sede'.</span>
+        </div>
+
+        <div style="display:grid; grid-template-columns:1fr 1.2fr; gap:8px;">
+          <div class="form-group">
+            <label class="form-label">Día de Atención</label>
+            <input type="text" id="edit-teacher-day" class="form-input" placeholder="Ej: Miércoles" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Horario de Atención</label>
+            <input type="text" id="edit-teacher-hours" class="form-input" placeholder="Ej: 12:30 PM - 1:20 PM" required>
+          </div>
+        </div>
+
+        <div class="modal-actions-row">
+          <button type="button" class="btn-secondary flex-1" onclick="closeModal('modal-edit-teacher')">Cancelar</button>
+          <button type="submit" class="btn-primary flex-1">Guardar Datos 💾</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: EDIT / ADD CLASS SLOT -->
+  <div id="modal-edit-class-slot" class="modal-backdrop">
+    <div class="modal-card">
+      <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;">
+        <span id="edit-slot-icon-preview" style="font-size:28px;">📚</span>
+        <div>
+          <h3 id="edit-slot-modal-title" class="modal-title" style="margin:0;">Editar Bloque de Horario</h3>
+          <p style="font-size:11px; color:var(--text-muted); margin:2px 0 0 0;">Configura la materia, docente y horario</p>
+        </div>
+      </div>
+
+      <form onsubmit="handleSaveClassSlot(event)" class="modal-form">
+        <input type="hidden" id="edit-slot-day" value="Lunes">
+        <input type="hidden" id="edit-slot-index" value="-1">
+
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+          <div class="form-group">
+            <label class="form-label">Día de la Semana</label>
+            <select id="edit-slot-select-day" class="form-select">
+              <option value="Lunes">Lunes</option>
+              <option value="Martes">Martes</option>
+              <option value="Miércoles">Miércoles</option>
+              <option value="Jueves">Jueves</option>
+              <option value="Viernes">Viernes</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Franja Horaria</label>
+            <input type="text" id="edit-slot-time" class="form-input" placeholder="Ej: 7:00 - 7:50" required>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Materia o Actividad</label>
+          <input type="text" id="edit-slot-subject" class="form-input" placeholder="Ej: Matemáticas" required>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Docente Encargado</label>
+          <input type="text" id="edit-slot-teacher" class="form-input" placeholder="Ej: Manuel Alejandro Muñoz" required>
+        </div>
+
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; align-items:center;">
+          <div class="form-group">
+            <label class="form-label">Icono Emoji</label>
+            <input type="text" id="edit-slot-icon" class="form-input" value="📚" maxlength="4">
+          </div>
+          <div class="form-group" style="padding-top:14px;">
+            <label style="display:flex; align-items:center; gap:8px; font-size:12px; font-weight:700; cursor:pointer;">
+              <input type="checkbox" id="edit-slot-isbreak">
+              <span>¿Es Descanso? 🥪</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="modal-actions-row">
+          <button type="button" class="btn-secondary flex-1" onclick="closeModal('modal-edit-class-slot')">Cancelar</button>
+          <button type="submit" class="btn-primary flex-1">Guardar Bloque 💾</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: EDIT PARENT OBLIGATION -->
+  <div id="modal-edit-obligation" class="modal-backdrop">
+    <div class="modal-card">
+      <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;">
+        <span id="edit-obl-emoji-preview" style="font-size:28px;">📋</span>
+        <div>
+          <h3 class="modal-title" style="margin:0;">Editar Deber / Obligación</h3>
+          <p style="font-size:11px; color:var(--text-muted); margin:2px 0 0 0;">Modifica los detalles, puntos y fecha límite</p>
+        </div>
+      </div>
+
+      <form onsubmit="handleSaveObligation(event)" class="modal-form">
+        <input type="hidden" id="edit-obl-index" value="-1">
+
+        <div class="form-group">
+          <label class="form-label">Título del Deber</label>
+          <input type="text" id="edit-obl-title" class="form-input" required>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Descripción</label>
+          <textarea id="edit-obl-desc" class="form-textarea" rows="2" required></textarea>
+        </div>
+
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+          <div class="form-group">
+            <label class="form-label">Mes</label>
+            <input type="text" id="edit-obl-month" class="form-input" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Día Límite (1 - 31)</label>
+            <input type="number" id="edit-obl-due-day" class="form-input" min="1" max="31" required>
+          </div>
+        </div>
+
+        <div style="display:grid; grid-template-columns:1.5fr 1fr; gap:8px;">
+          <div class="form-group">
+            <label class="form-label">Nombre de Insignia</label>
+            <input type="text" id="edit-obl-badge-title" class="form-input" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Puntos Recompensa</label>
+            <input type="number" id="edit-obl-points" class="form-input" value="100" min="0" required>
+          </div>
+        </div>
+
+        <div class="modal-actions-row">
+          <button type="button" class="btn-secondary flex-1" onclick="closeModal('modal-edit-obligation')">Cancelar</button>
+          <button type="submit" class="btn-primary flex-1">Guardar Cambios 💾</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: EDIT / CREATE SCHOOL EVENT (CRUD Calendario General) -->
+  <div id="modal-edit-school-event" class="modal-backdrop">
+    <div class="modal-card">
+      <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;">
+        <div style="width:36px; height:36px; border-radius:50%; background:#dbeafe; display:flex; align-items:center; justify-content:center; font-size:18px;">📅</div>
+        <div>
+          <h3 id="edit-event-modal-title" class="modal-title" style="margin:0;">Editar Evento Institucional</h3>
+          <p style="font-size:11px; color:var(--text-muted); margin:2px 0 0 0;">Actualiza fecha, hora, lugar y detalles del evento en el calendario.</p>
+        </div>
+      </div>
+
+      <form onsubmit="handleSaveSchoolEvent(event)" class="modal-form">
+        <input type="hidden" id="edit-event-index" value="-1">
+
+        <div class="form-group">
+          <label class="form-label">Título del Evento</label>
+          <input type="text" id="edit-event-title" class="form-input" placeholder="Ej: Reunión de Padres de Familia" required>
+        </div>
+
+        <div style="display:grid; grid-template-columns:1.5fr 1fr; gap:8px;">
+          <div class="form-group">
+            <label class="form-label">Texto de Fecha (Ej: Septiembre 3)</label>
+            <input type="text" id="edit-event-date-str" class="form-input" placeholder="Septiembre 3" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Mes</label>
+            <select id="edit-event-month" class="form-select">
+              <option value="Enero">Enero</option>
+              <option value="Febrero">Febrero</option>
+              <option value="Marzo">Marzo</option>
+              <option value="Abril">Abril</option>
+              <option value="Mayo">Mayo</option>
+              <option value="Junio">Junio</option>
+              <option value="Julio">Julio</option>
+              <option value="Agosto">Agosto</option>
+              <option value="Septiembre">Septiembre</option>
+              <option value="Octubre">Octubre</option>
+              <option value="Noviembre">Noviembre</option>
+              <option value="Diciembre">Diciembre</option>
+            </select>
+          </div>
+        </div>
+
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+          <div class="form-group">
+            <label class="form-label">Hora (Ej: 5:00 PM, 6:45 AM)</label>
+            <input type="text" id="edit-event-time" class="form-input" placeholder="08:00 AM" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Categoría</label>
+            <select id="edit-event-category" class="form-select">
+              <option value="INSTITUTIONAL">🏫 Institucional</option>
+              <option value="COMMUNITY">👨‍👩‍👧 Padres de Familia</option>
+              <option value="ACADEMIC">📝 Académico / Exámenes</option>
+              <option value="CIVIC">🇨🇴 Cívico / Izada</option>
+              <option value="CULTURAL">🎭 Cultural / Jean Day</option>
+              <option value="CAFETERIA">🍔 Cafetería</option>
+            </select>
+          </div>
+        </div>
+
+        <div style="display:grid; grid-template-columns:1fr 60px; gap:8px;">
+          <div class="form-group">
+            <label class="form-label">Lugar / Sede</label>
+            <input type="text" id="edit-event-location" class="form-input" placeholder="Auditorio Institucional" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Icono</label>
+            <input type="text" id="edit-event-emoji" class="form-input" value="📅" style="text-align:center;">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Descripción / Observación</label>
+          <textarea id="edit-event-desc" class="form-textarea" rows="2" placeholder="Detalles informativos del evento..."></textarea>
+        </div>
+
+        <div class="modal-actions-row">
+          <button type="button" class="btn-secondary flex-1" onclick="closeModal('modal-edit-school-event')">Cancelar</button>
+          <button type="submit" class="btn-primary flex-1">Guardar Evento 💾</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: CREATE / EDIT JOURNAL ENTRY (Bitácora Escolar) -->
+  <div id="modal-journal-entry" class="modal-backdrop">
+    <div class="modal-card">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+        <div style="display:flex; align-items:center; gap:10px;">
+          <span style="font-size:26px;">📖</span>
+          <div>
+            <h3 id="modal-journal-title" class="modal-title" style="margin:0;">Mi Entrada de Hoy</h3>
+            <p style="font-size:11px; color:var(--text-muted); margin:2px 0 0 0;">Comparte tus vivencias, reflexiones y aprendizajes</p>
+          </div>
+        </div>
+        <button type="button" class="btn-banner-close" onclick="closeModal('modal-journal-entry')">✕</button>
+      </div>
+
+      <form onsubmit="handleSaveJournalEntry(event)" class="modal-form">
+        <input type="hidden" id="journal-entry-id" value="">
+
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+          <div class="form-group">
+            <label class="form-label">Fecha</label>
+            <input type="date" id="journal-entry-date" class="form-input" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Materia / Área</label>
+            <select id="journal-entry-subject" class="form-select">
+              <option value="General 🌟">General 🌟</option>
+              <option value="Dirección de grupo">👨‍🏫 Dirección de grupo</option>
+              <option value="Sistemas">💻 Sistemas</option>
+              <option value="Biología">🔬 Biología</option>
+              <option value="Inglés">🇬🇧 Inglés</option>
+              <option value="Sociales">🌍 Sociales</option>
+              <option value="Español">📖 Español</option>
+              <option value="Geometría">📐 Geometría</option>
+              <option value="Matemáticas">➕ Matemáticas</option>
+              <option value="Estética">🎨 Estética</option>
+              <option value="Música">🎵 Música</option>
+              <option value="Cátedra emocional">💛 Cátedra emocional</option>
+              <option value="Física">⚡ Física</option>
+              <option value="Educación Física">⚽ Educación Física</option>
+              <option value="Ética">🤝 Ética</option>
+              <option value="Química">🧪 Química</option>
+              <option value="Religión">🕊️ Religión</option>
+              <option value="Razonamiento Matemático">🧠 Razonamiento Matemático</option>
+              <option value="Convivencia Escolar 🤝">Convivencia Escolar 🤝</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">¿Cómo te sentiste hoy? (Elige tu emoción)</label>
+          <input type="hidden" id="journal-entry-mood" value="FELIZ">
+          <div class="journal-mood-grid">
+            <div class="mood-option-btn selected" onclick="selectJournalMood('FELIZ', this)">
+              <span class="mood-emoji">😊</span>
+              <span>Feliz / Animada</span>
+            </div>
+            <div class="mood-option-btn" onclick="selectJournalMood('INSPIRADA', this)">
+              <span class="mood-emoji">🌟</span>
+              <span>Inspirada</span>
+            </div>
+            <div class="mood-option-btn" onclick="selectJournalMood('CREATIVA', this)">
+              <span class="mood-emoji">💡</span>
+              <span>Creativa</span>
+            </div>
+            <div class="mood-option-btn" onclick="selectJournalMood('TRANQUILA', this)">
+              <span class="mood-emoji">🧘</span>
+              <span>Tranquila</span>
+            </div>
+            <div class="mood-option-btn" onclick="selectJournalMood('ENFOCADA', this)">
+              <span class="mood-emoji">📚</span>
+              <span>Muy enfocada</span>
+            </div>
+            <div class="mood-option-btn" onclick="selectJournalMood('CANSADA', this)">
+              <span class="mood-emoji">🥱</span>
+              <span>Cansada</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Título de la entrada</label>
+          <input type="text" id="journal-entry-title-input" class="form-input" placeholder="Ej: ¡Hoy entendí un tema difícil! o Día de experimentos" required>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">¿Qué pasó hoy? / ¿Qué aprendiste?</label>
+          <textarea id="journal-entry-content" class="form-textarea" rows="4" placeholder="Escribe libremente sobre tu día, tus dudas, tus logros o lo que más disfrutaste..." required></textarea>
+        </div>
+
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+          <div class="form-group">
+            <label class="form-label">Sticker del Día</label>
+            <select id="journal-entry-sticker" class="form-select">
+              <option value="⭐">⭐ Estrella</option>
+              <option value="🌸">🌸 Flor</option>
+              <option value="🚀">🚀 Cohete</option>
+              <option value="🎨">🎨 Paleta de Arte</option>
+              <option value="🔬">🔬 Microscopio</option>
+              <option value="📚">📚 Libros</option>
+              <option value="🏆">🏆 Trofeo</option>
+              <option value="🌈">🌈 Arcoíris</option>
+              <option value="💡">💡 Idea genial</option>
+              <option value="🥪">🥪 Buen descanso</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Privacidad</label>
+            <select id="journal-entry-privacy" class="form-select">
+              <option value="PUBLIC">👨‍🏫 Compartir con Profesores y Acudientes</option>
+              <option value="PRIVATE">🔒 Privado (Solo para mí)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="modal-actions-row" style="margin-top:14px;">
+          <button type="button" class="btn-secondary flex-1" onclick="closeModal('modal-journal-entry')">Cancelar</button>
+          <button type="submit" class="btn-primary flex-1">Guardar en mi Bitácora 💾</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: STUDENT RANKS (Escalafón de Rangos Escolares) -->
+  <div id="modal-student-ranks" class="modal-backdrop">
+    <div class="modal-card" style="max-width:480px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span style="font-size:24px;">🏆</span>
+          <h3 class="modal-title" style="margin:0;">Rangos Escolares</h3>
+        </div>
+        <button type="button" class="btn-banner-close" onclick="closeModal('modal-student-ranks')">✕</button>
+      </div>
+      <p style="font-size:12px; color:var(--text-muted); margin-bottom:14px;">
+        Avanza de nivel acumulando puntos de experiencia (XP) mediante tu participación diaria, tareas a tiempo y buen compañerismo.
+      </p>
+
+      <div id="student-ranks-tiers-list" class="cards-column" style="gap:8px; max-height:55vh; overflow-y:auto; padding-right:2px;">
+        <!-- Dynamically rendered by JS -->
+      </div>
+
+      <div class="modal-actions-row" style="margin-top:16px;">
+        <button type="button" class="btn-primary flex-1" onclick="closeModal('modal-student-ranks')">¡Entendido! 🎒</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOAST NOTIFICATION -->
+  <div id="toast" class="toast-msg"></div>
+
+</div>
+
+<!-- Application Script -->
+<script src="/app.js?v=4.6"></script>
+</body>
+</html>

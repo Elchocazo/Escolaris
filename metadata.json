@@ -1,0 +1,6 @@
+{
+  "name": "Escolaris",
+  "description": "Red social escolar y plataforma de seguimiento académico, tareas, gamificación, control de padres y exámenes.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

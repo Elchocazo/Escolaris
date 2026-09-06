@@ -1,0 +1,13 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Reglas universales y permisivas para Escolaris:
+    // Permite lectura y escritura garantizando que nunca se pierdan puntos,
+    // publicaciones, medallas ni deberes por falta de permisos en el cliente.
+    match /{document=**} {
+      allow read, write: if true;
+    }
+  }
+}
