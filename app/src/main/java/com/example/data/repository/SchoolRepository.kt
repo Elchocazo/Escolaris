@@ -98,6 +98,8 @@ interface ISchoolRepository {
     // BADGES
     val allBadges: Flow<List<BadgeEntity>>
     fun getBadgesForStudent(studentId: String): Flow<List<BadgeEntity>>
+    suspend fun getAllBadgesDirect(): List<BadgeEntity>
+    suspend fun getBadgeByStudentAndKey(studentId: String, badgeKey: String): BadgeEntity?
     suspend fun insertBadge(badge: BadgeEntity): Long
     suspend fun deleteBadge(badge: BadgeEntity)
     suspend fun deleteBadgeById(id: Long)
@@ -124,6 +126,7 @@ interface ISchoolRepository {
 
     // PARENT OBLIGATIONS & PENSIONES
     val allParentObligations: Flow<List<ParentObligationEntity>>
+    suspend fun getAllParentObligationsDirect(): List<ParentObligationEntity>
     fun getObligationsForParent(parentId: String, studentId: String): Flow<List<ParentObligationEntity>>
     suspend fun insertParentObligation(obligation: ParentObligationEntity): Long
     suspend fun updateParentObligation(obligation: ParentObligationEntity)
@@ -298,6 +301,8 @@ class SchoolRepository(private val dao: SchoolDao) : ISchoolRepository {
     // BADGES
     override val allBadges: Flow<List<BadgeEntity>> = dao.getAllBadges()
     override fun getBadgesForStudent(studentId: String): Flow<List<BadgeEntity>> = dao.getBadgesForStudent(studentId)
+    override suspend fun getAllBadgesDirect(): List<BadgeEntity> = dao.getAllBadgesDirect()
+    override suspend fun getBadgeByStudentAndKey(studentId: String, badgeKey: String): BadgeEntity? = dao.getBadgeByStudentAndKey(studentId, badgeKey)
 
     override suspend fun insertBadge(badge: BadgeEntity): Long = dao.insertBadge(badge)
     override suspend fun deleteBadge(badge: BadgeEntity) = dao.deleteBadge(badge)
@@ -405,6 +410,7 @@ class SchoolRepository(private val dao: SchoolDao) : ISchoolRepository {
 
     // PARENT OBLIGATIONS & PENSIONES
     override val allParentObligations: Flow<List<ParentObligationEntity>> = dao.getAllParentObligations()
+    override suspend fun getAllParentObligationsDirect(): List<ParentObligationEntity> = dao.getAllParentObligationsDirect()
     override fun getObligationsForParent(parentId: String, studentId: String): Flow<List<ParentObligationEntity>> = dao.getObligationsForParent(parentId, studentId)
     override suspend fun insertParentObligation(obligation: ParentObligationEntity): Long = dao.insertParentObligation(obligation)
     override suspend fun updateParentObligation(obligation: ParentObligationEntity) = dao.updateParentObligation(obligation)

@@ -19,10 +19,25 @@ import com.example.data.local.entity.UserEntity
 enum class UserRole(val code: String, val displayName: String, val badgeEmoji: String) {
     STUDENT("STUDENT", "Estudiante", "🎓"),
     PARENT("PARENT", "Padre / Tutor", "👨‍👩‍👧"),
-    TEACHER("TEACHER", "Docente Titular & SuperAdmin", "👑");
+    TEACHER("TEACHER", "Docente Titular", "👨‍🏫"),
+    ADMIN("ADMIN", "Administrador Escolar & SuperAdmin", "👑");
 
     companion object {
-        fun fromCode(code: String?): UserRole = entries.find { it.code.equals(code, ignoreCase = true) } ?: STUDENT
+        fun fromCode(code: String?): UserRole {
+            if (code.isNullOrBlank()) return STUDENT
+            if (code.equals("ADMIN", ignoreCase = true)) return ADMIN
+            if (code.equals("TEACHER", ignoreCase = true) || code.equals("DOCENTE", ignoreCase = true)) return TEACHER
+            if (code.equals("PARENT", ignoreCase = true) || code.equals("ACUDIENTE", ignoreCase = true)) return PARENT
+            return entries.find { it.code.equals(code, ignoreCase = true) } ?: STUDENT
+        }
+
+        fun isTeacherOrAdmin(role: String?): Boolean {
+            if (role.isNullOrBlank()) return false
+            return role.equals(TEACHER.code, ignoreCase = true) ||
+                   role.equals(ADMIN.code, ignoreCase = true) ||
+                   role.equals("DOCENTE", ignoreCase = true) ||
+                   role.equals("SUPERADMIN", ignoreCase = true)
+        }
     }
 }
 

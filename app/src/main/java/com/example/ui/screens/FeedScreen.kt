@@ -93,7 +93,7 @@ fun FeedScreen(
     var showCreatePostDialog by remember { mutableStateOf(false) }
     var selectedFilter by remember { mutableStateOf("TODOS") }
 
-    val isTeacher = currentUser?.role == UserRole.TEACHER.code
+    val isTeacher = UserRole.isTeacherOrAdmin(currentUser?.role) || currentUser?.email == "moz658@gmail.com"
     val isParent = currentUser?.role == UserRole.PARENT.code
     val isParentLinked = isParent && !currentUser?.linkedStudentId.isNullOrBlank()
 
@@ -398,7 +398,7 @@ fun FeedPostCard(
 
     val dateFormat = SimpleDateFormat("dd MMM, HH:mm", Locale.getDefault())
     val isLateHelp = post.postType == PostType.LATE_HELP_REQUEST.code
-    val isTeacher = currentUser?.role == UserRole.TEACHER.code
+    val isTeacher = UserRole.isTeacherOrAdmin(currentUser?.role) || currentUser?.email == "moz658@gmail.com"
     var showAuthorPhotoDialog by remember { mutableStateOf(false) }
 
     val author = if (post.authorId == currentUser?.id) currentUser else allUsers.find { it.id == post.authorId }
@@ -406,10 +406,11 @@ fun FeedPostCard(
     val liveAuthorName = com.example.domain.validation.ValidationUtils.formatProperNoun(
         rawAuthorName.replace(Regex("\\s*\\((Docente|Estudiante|Profesor|Familia)\\)"), "")
     )
+    val isAuthorTeacherOrAdmin = UserRole.isTeacherOrAdmin(author?.role ?: post.authorRole) || author?.email == "moz658@gmail.com"
     val livePhotoUri = author?.photoUri
-    val liveEmoji = author?.avatarEmoji?.ifBlank { if (author.role == UserRole.TEACHER.code) "👨‍🏫" else "🎓" } ?: (if (post.authorRole == UserRole.TEACHER.code) "👨‍🏫" else "🎓")
+    val liveEmoji = author?.avatarEmoji?.ifBlank { if (isAuthorTeacherOrAdmin) "👨‍🏫" else "🎓" } ?: (if (isAuthorTeacherOrAdmin) "👨‍🏫" else "🎓")
     val liveColor = author?.avatarColorHex ?: post.authorAvatarColorHex
-    val liveRole = author?.role ?: post.authorRole
+    val liveRole = if (isAuthorTeacherOrAdmin) UserRole.TEACHER.code else (author?.role ?: post.authorRole)
 
     Surface(
         shape = RoundedCornerShape(16.dp),
@@ -480,7 +481,7 @@ fun FeedPostCard(
                             horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
                             Text(
-                                text = liveAuthorName,
+                                text = com.example.domain.validation.ValidationUtils.formatProperNoun(liveAuthorName),
                                 fontWeight = FontWeight.Bold,
                                 style = MaterialTheme.typography.titleSmall,
                                 color = MaterialTheme.colorScheme.onSurface,
@@ -488,19 +489,22 @@ fun FeedPostCard(
                                 overflow = TextOverflow.Ellipsis,
                                 modifier = Modifier.weight(1f, fill = false)
                             )
-                            val roleBadge = when (liveRole) {
-                                UserRole.TEACHER.code -> "Docente"
-                                UserRole.PARENT.code -> "Familia"
+                            val isAdmin = liveRole == UserRole.ADMIN.code || liveRole == "ADMIN" || liveRole == "SUPERADMIN"
+                            val isDocente = liveRole == UserRole.TEACHER.code || liveRole == "DOCENTE"
+                            val roleBadge = when {
+                                isAdmin -> "Admin 👑"
+                                isDocente -> "Docente"
+                                liveRole == UserRole.PARENT.code -> "Familia"
                                 else -> "Estudiante"
                             }
                             Surface(
                                 shape = RoundedCornerShape(6.dp),
-                                color = if (liveRole == UserRole.TEACHER.code) GoldStar.copy(alpha = 0.2f) else MaterialTheme.colorScheme.primaryContainer
+                                color = if (isAdmin) Color(0xFFEDE9FE) else if (isDocente) GoldStar.copy(alpha = 0.2f) else MaterialTheme.colorScheme.primaryContainer
                             ) {
                                 Text(
                                     text = roleBadge,
                                     style = MaterialTheme.typography.labelSmall,
-                                    color = if (liveRole == UserRole.TEACHER.code) Color(0xFFB45309) else MaterialTheme.colorScheme.onPrimaryContainer,
+                                    color = if (isAdmin) Color(0xFF6D28D9) else if (isDocente) Color(0xFFB45309) else MaterialTheme.colorScheme.onPrimaryContainer,
                                     fontWeight = FontWeight.Bold,
                                     softWrap = false,
                                     modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
@@ -819,12 +823,13 @@ fun FeedPostCard(
     }
 
     if (showAuthorPhotoDialog) {
+        val displayGrade = if (isAuthorTeacherOrAdmin) "Docente Titular" else (if (post.subject.equals("General", ignoreCase = true) || post.subject.equals("Colegio general", ignoreCase = true)) "" else post.subject)
         ProfilePhotoViewerDialog(
             photoUri = livePhotoUri,
             avatarEmoji = liveEmoji,
             userName = liveAuthorName,
             userRole = liveRole,
-            gradeSection = post.subject,
+            gradeSection = displayGrade,
             onDismiss = { showAuthorPhotoDialog = false }
         )
     }
@@ -905,28 +910,31 @@ fun CommentRowItem(
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         Text(
-                            text = commenterName,
+                            text = com.example.domain.validation.ValidationUtils.formatProperNoun(commenterName),
                             fontWeight = FontWeight.Bold,
                             style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.onSurface,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
-                        val roleBadge = when (commenterRole) {
-                            UserRole.TEACHER.code -> "Docente"
-                            UserRole.PARENT.code -> "Familia"
+                        val isCommentAdmin = commenterRole == UserRole.ADMIN.code || commenterRole == "ADMIN" || commenterRole == "SUPERADMIN"
+                        val isCommentTeacher = commenterRole == UserRole.TEACHER.code || commenterRole == "DOCENTE"
+                        val roleBadge = when {
+                            isCommentAdmin -> "Admin 👑"
+                            isCommentTeacher -> "Docente"
+                            commenterRole == UserRole.PARENT.code -> "Familia"
                             else -> "Estudiante"
                         }
                         Surface(
                             shape = RoundedCornerShape(4.dp),
-                            color = if (commenterRole == UserRole.TEACHER.code) GoldStar.copy(alpha = 0.2f) else MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+                            color = if (isCommentAdmin) Color(0xFFEDE9FE) else if (isCommentTeacher) GoldStar.copy(alpha = 0.2f) else MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
                         ) {
                             Text(
                                 text = roleBadge,
                                 fontSize = 9.sp,
                                 fontWeight = FontWeight.Bold,
                                 softWrap = false,
-                                color = if (commenterRole == UserRole.TEACHER.code) Color(0xFFB45309) else MaterialTheme.colorScheme.primary,
+                                color = if (isCommentAdmin) Color(0xFF6D28D9) else if (isCommentTeacher) Color(0xFFB45309) else MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
                             )
                         }

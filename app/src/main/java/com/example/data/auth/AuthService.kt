@@ -86,7 +86,8 @@ class AuthService(
         studentCodeToLink: String = ""
     ): Result<UserEntity> = withContext(Dispatchers.IO) {
         val cleanEmail = email.trim().lowercase()
-        val isTeacherAccount = cleanEmail == "moz658@gmail.com" || role == UserRole.TEACHER.code
+        val isSuperAdmin = cleanEmail == "moz658@gmail.com" || role == UserRole.ADMIN.code || role == "ADMIN"
+        val isTeacherAccount = isSuperAdmin || role == UserRole.TEACHER.code || role == "DOCENTE"
         val isParentAccount = role == UserRole.PARENT.code && !isTeacherAccount
         val isStudentAccount = !isTeacherAccount && !isParentAccount
 
@@ -105,9 +106,9 @@ class AuthService(
             }
         }
 
-        val assignedRole = if (isTeacherAccount) UserRole.TEACHER.code else if (isParentAccount) UserRole.PARENT.code else UserRole.STUDENT.code
-        val themeColor = if (isTeacherAccount) 0xFF1D4ED8 else if (isParentAccount) 0xFF059669 else 0xFF2563EB
-        val defaultEmoji = if (isTeacherAccount) "👨‍🏫" else if (isParentAccount) "👨‍👩‍👧" else "🎓"
+        val assignedRole = if (isSuperAdmin) UserRole.ADMIN.code else if (isTeacherAccount) UserRole.TEACHER.code else if (isParentAccount) UserRole.PARENT.code else UserRole.STUDENT.code
+        val themeColor = if (isSuperAdmin) 0xFF7C3AED else if (isTeacherAccount) 0xFF1D4ED8 else if (isParentAccount) 0xFF059669 else 0xFF2563EB
+        val defaultEmoji = if (isSuperAdmin) "👑" else if (isTeacherAccount) "👨‍🏫" else if (isParentAccount) "👨‍👩‍👧" else "🎓"
         val bannerIdx = if (isTeacherAccount) 0 else if (isParentAccount) 1 else 0
         
         val gradeSection = if (isTeacherAccount) {
@@ -244,23 +245,23 @@ class AuthService(
             if (remoteUser != null) {
                 Result.success(remoteUser)
             } else {
-                // If it's the teacher account or new account, register locally
-                val isTeacher = cleanEmail == "moz658@gmail.com"
+                // If it's the admin/teacher account or new account, register locally
+                val isSuperAdmin = cleanEmail == "moz658@gmail.com"
                 val fallbackUser = UserEntity(
-                    id = UUID.randomUUID().toString(),
-                    name = if (isTeacher) "Manuel Muñoz" else "Estudiante Escolaris",
+                    id = if (isSuperAdmin) "teacher_moz658" else UUID.randomUUID().toString(),
+                    name = if (isSuperAdmin) "Manuel Alejandro Muñoz" else "Estudiante Escolaris",
                     email = cleanEmail,
-                    role = if (isTeacher) UserRole.TEACHER.code else UserRole.STUDENT.code,
-                    studentCode = if (isTeacher) "" else generateUniqueStudentCode(),
-                    avatarColorHex = if (isTeacher) 0xFF1D4ED8 else 0xFF2563EB,
-                    avatarInitials = if (isTeacher) "MM" else "EE",
-                    gradeSection = if (isTeacher) "Docente Titular" else "10° Grado",
+                    role = if (isSuperAdmin) UserRole.ADMIN.code else UserRole.STUDENT.code,
+                    studentCode = if (isSuperAdmin) "" else generateUniqueStudentCode(),
+                    avatarColorHex = if (isSuperAdmin) 0xFF7C3AED else 0xFF2563EB,
+                    avatarInitials = if (isSuperAdmin) "MM" else "EE",
+                    gradeSection = if (isSuperAdmin) "Administrador & Docente" else "10° Grado",
                     streakDays = 1,
-                    xp = if (isTeacher) 200 else 50,
+                    xp = if (isSuperAdmin) 500 else 50,
                     level = 1,
-                    credits = if (isTeacher) 500 else 100,
-                    bio = if (isTeacher) "Docente Titular en Escolaris 🚀" else "Estudiante activo en Escolaris 🚀",
-                    avatarEmoji = if (isTeacher) "👨‍🏫" else "🎓",
+                    credits = if (isSuperAdmin) 1000 else 100,
+                    bio = if (isSuperAdmin) "Administrador Escolar & Docente Titular en Escolaris 👑" else "Estudiante activo en Escolaris 🚀",
+                    avatarEmoji = if (isSuperAdmin) "👑" else "🎓",
                     bannerGradientIndex = 0
                 )
                 schoolDao.insertUser(fallbackUser)
@@ -298,24 +299,25 @@ class AuthService(
             return@withContext Result.success(existingUser)
         }
 
-        val isTeacher = isTeacherAccount(fallbackEmail)
+        val isSuperAdmin = fallbackEmail == "moz658@gmail.com"
+        val isTeacher = isSuperAdmin || isTeacherAccount(fallbackEmail)
         val defaultName = if (isTeacher) "Manuel Alejandro Muñoz" else "Estudiante Escolaris"
         val googleUser = UserEntity(
-            id = if (isTeacher) "teacher_moz658" else "google_user_${System.currentTimeMillis()}",
+            id = if (isSuperAdmin) "teacher_moz658" else "google_user_${System.currentTimeMillis()}",
             name = defaultName,
             email = fallbackEmail,
-            role = if (isTeacher) UserRole.TEACHER.code else UserRole.STUDENT.code,
+            role = if (isSuperAdmin) UserRole.ADMIN.code else if (isTeacher) UserRole.TEACHER.code else UserRole.STUDENT.code,
             studentCode = if (isTeacher) "" else generateUniqueStudentCode(),
             teacherCode = if (isTeacher) "DOC-102938" else "",
-            avatarColorHex = if (isTeacher) 0xFF1D4ED8 else 0xFF2563EB,
+            avatarColorHex = if (isSuperAdmin) 0xFF7C3AED else if (isTeacher) 0xFF1D4ED8 else 0xFF2563EB,
             avatarInitials = if (isTeacher) "MM" else "EE",
-            gradeSection = if (isTeacher) "Docente Titular" else "10° Grado",
+            gradeSection = if (isSuperAdmin) "Administrador & Docente" else if (isTeacher) "Docente Titular" else "10° Grado",
             streakDays = 0,
-            xp = 0,
+            xp = if (isSuperAdmin) 500 else 0,
             level = 1,
-            credits = 0,
-            bio = if (isTeacher) "Docente Titular en Escolaris 🚀" else "Estudiante activo en Escolaris 🚀",
-            avatarEmoji = if (isTeacher) "👨‍🏫" else "🎓",
+            credits = if (isSuperAdmin) 1000 else 0,
+            bio = if (isSuperAdmin) "Administrador Escolar & Docente Titular en Escolaris 👑" else if (isTeacher) "Docente Titular en Escolaris 🚀" else "Estudiante activo en Escolaris 🚀",
+            avatarEmoji = if (isSuperAdmin) "👑" else if (isTeacher) "👨‍🏫" else "🎓",
             bannerGradientIndex = 0
         )
         schoolDao.insertUser(googleUser)
@@ -389,24 +391,26 @@ class AuthService(
             return@withContext Result.success(existing)
         }
 
-        val isSuperAdmin = cleanEmail == "moz658@gmail.com"
-        val isTeacher = isSuperAdmin || role == UserRole.TEACHER.code
+        val isSuperAdmin = cleanEmail == "moz658@gmail.com" || role == UserRole.ADMIN.code || role == "ADMIN"
+        val isTeacher = isSuperAdmin || role == UserRole.TEACHER.code || role == "DOCENTE"
         val isParent = !isSuperAdmin && role == UserRole.PARENT.code
-        val assignedRole = if (isSuperAdmin) UserRole.TEACHER.code else role
+        val assignedRole = if (isSuperAdmin) UserRole.ADMIN.code else role
 
-        val defaultName = if (displayName.isNotBlank()) displayName.trim() else if (isTeacher) "Manuel Alejandro Muñoz" else if (isParent) "Padre / Tutor" else "Estudiante Escolaris"
-        val themeColor = if (isTeacher) 0xFF1D4ED8 else if (isParent) 0xFF059669 else 0xFF2563EB
-        val emoji = if (isTeacher) "👨‍🏫" else if (isParent) "👨‍👩‍👧" else "🎓"
-        val initials = defaultName.split(" ").take(2).mapNotNull { it.firstOrNull()?.uppercase() }.joinToString("").ifBlank { if (isTeacher) "MM" else if (isParent) "PT" else "EE" }
+        val defaultName = if (displayName.isNotBlank()) displayName.trim() else if (isSuperAdmin || isTeacher) "Manuel Alejandro Muñoz" else if (isParent) "Padre / Tutor" else "Estudiante Escolaris"
+        val themeColor = if (isSuperAdmin) 0xFF7C3AED else if (isTeacher) 0xFF1D4ED8 else if (isParent) 0xFF059669 else 0xFF2563EB
+        val emoji = if (isSuperAdmin) "👑" else if (isTeacher) "👨‍🏫" else if (isParent) "👨‍👩‍👧" else "🎓"
+        val initials = defaultName.split(" ").take(2).mapNotNull { it.firstOrNull()?.uppercase() }.joinToString("").ifBlank { if (isSuperAdmin || isTeacher) "MM" else if (isParent) "PT" else "EE" }
 
         val generatedCode = if (isTeacher || isParent) "" else generateUniqueStudentCode()
         val finalGradeSection = when {
+            isSuperAdmin -> "Administrador & Docente"
             isTeacher -> gradeSectionInput.ifBlank { "Docente Titular" }
             isParent -> if (studentCodeToLink.isNotBlank()) "Tutor de: $studentCodeToLink" else "Padre / Tutor"
             else -> gradeSectionInput.ifBlank { "10° Grado" }
         }
 
         val bioText = when {
+            isSuperAdmin -> "Administrador Escolar & Docente Titular en Escolaris 👑"
             isTeacher -> "Docente Titular en Escolaris 🚀"
             isParent -> "Padre / Tutor en Escolaris 👨‍👩‍👧"
             else -> "Estudiante activo en Escolaris 🚀"
@@ -513,22 +517,29 @@ class AuthService(
                 }
 
                 if (doc.exists()) {
+                    val isSuperAdmin = email == "moz658@gmail.com"
                     val rawName = doc.getString("name")?.takeIf { it.isNotBlank() }
                         ?: firebaseUser.displayName?.takeIf { it.isNotBlank() }
                         ?: if (isTeacherAccount) "Manuel Alejandro Muñoz" else email.substringBefore("@")
-                    val name = if (isTeacherAccount && (rawName == "Usuario" || rawName == "Docente Titular" || rawName.isBlank())) "Manuel Alejandro Muñoz" else rawName
-                    val role = if (isTeacherAccount) UserRole.TEACHER.code else (doc.getString("role") ?: UserRole.STUDENT.code)
+                    val name = ValidationUtils.formatProperNoun(if (isTeacherAccount && (rawName == "Usuario" || rawName == "Docente Titular" || rawName.isBlank())) "Manuel Alejandro Muñoz" else rawName)
+                    val role = if (isSuperAdmin) {
+                        UserRole.ADMIN.code
+                    } else if (isTeacherAccount) {
+                        doc.getString("role")?.takeIf { it == UserRole.ADMIN.code } ?: UserRole.TEACHER.code
+                    } else {
+                        doc.getString("role") ?: UserRole.STUDENT.code
+                    }
                     val gender = doc.getString("gender") ?: (preferredGender ?: "MALE")
                     val isGirl = gender.equals("FEMALE", ignoreCase = true)
-                    val defaultColor = if (isTeacherAccount) 0xFF1D4ED8 else if (isGirl) 0xFFE11D74 else 0xFF2563EB
+                    val defaultColor = if (isSuperAdmin) 0xFF7C3AED else if (isTeacherAccount) 0xFF1D4ED8 else if (isGirl) 0xFFE11D74 else 0xFF2563EB
 
                     val credits = (doc.getLong("credits") ?: 0L).toInt()
                     val xp = (doc.getLong("xp") ?: 0L).toInt()
                     val level = (doc.getLong("level") ?: 1L).toInt()
                     val streak = (doc.getLong("streakDays") ?: 0L).toInt()
-                    val bio = doc.getString("bio") ?: if (isTeacherAccount) "Docente Titular en Escolaris 🚀" else "Estudiante activo en Escolaris 🚀"
-                    val emoji = doc.getString("avatarEmoji") ?: if (isTeacherAccount) "👨‍🏫" else "🎓"
-                    val gradeSection = doc.getString("gradeSection") ?: if (isTeacherAccount) "Docente Titular" else "10° Grado"
+                    val bio = doc.getString("bio") ?: if (isSuperAdmin) "Administrador Escolar & Docente Titular en Escolaris 👑" else if (isTeacherAccount) "Docente Titular en Escolaris 🚀" else "Estudiante activo en Escolaris 🚀"
+                    val emoji = doc.getString("avatarEmoji") ?: if (isSuperAdmin) "👑" else if (isTeacherAccount) "👨‍🏫" else "🎓"
+                    val gradeSection = doc.getString("gradeSection") ?: if (isSuperAdmin) "Administrador & Docente" else if (isTeacherAccount) "Docente Titular" else "10° Grado"
                     val colorHex = doc.getLong("avatarColorHex") ?: defaultColor
                     val studentCode = if (isTeacherAccount) "" else (doc.getString("studentCode") ?: generateUniqueStudentCode())
                     val teacherCode = if (isTeacherAccount) "DOC-102938" else (doc.getString("teacherCode") ?: "")
@@ -588,8 +599,10 @@ class AuthService(
         val localExisting = if (firestoreUser == null && email.isNotBlank()) schoolDao.getUserByEmail(email) else null
 
         val userEntity = firestoreUser ?: localExisting?.copy(id = userId) ?: run {
-            val name = if (isTeacherAccount) "Manuel Alejandro Muñoz" else (firebaseUser.displayName?.takeIf { it.isNotBlank() } ?: email.substringBefore("@"))
-            val assignedRole = if (isTeacherAccount) UserRole.TEACHER.code else UserRole.STUDENT.code
+            val isSuperAdmin = email == "moz658@gmail.com"
+            val rawName = if (isTeacherAccount) "Manuel Alejandro Muñoz" else (firebaseUser.displayName?.takeIf { it.isNotBlank() } ?: email.substringBefore("@"))
+            val name = ValidationUtils.formatProperNoun(rawName)
+            val assignedRole = if (isSuperAdmin) UserRole.ADMIN.code else if (isTeacherAccount) UserRole.TEACHER.code else UserRole.STUDENT.code
             val newUser = UserEntity(
                 id = userId,
                 name = name,
@@ -597,15 +610,15 @@ class AuthService(
                 role = assignedRole,
                 studentCode = if (isTeacherAccount) "" else generateUniqueStudentCode(),
                 teacherCode = if (isTeacherAccount) "DOC-102938" else "",
-                avatarColorHex = if (isTeacherAccount) 0xFF1D4ED8 else 0xFF2563EB,
-                avatarInitials = name.take(2).uppercase(),
-                gradeSection = if (isTeacherAccount) "Docente Titular" else "10° Grado",
+                avatarColorHex = if (isSuperAdmin) 0xFF7C3AED else if (isTeacherAccount) 0xFF1D4ED8 else 0xFF2563EB,
+                avatarInitials = name.split(" ").take(2).mapNotNull { it.firstOrNull()?.uppercase() }.joinToString("").ifBlank { if (isTeacherAccount) "MM" else "ES" },
+                gradeSection = if (isSuperAdmin) "Administrador & Docente" else if (isTeacherAccount) "Docente Titular" else "10° Grado",
                 streakDays = 1,
-                xp = if (isTeacherAccount) 200 else 50,
+                xp = if (isSuperAdmin) 500 else if (isTeacherAccount) 200 else 50,
                 level = 1,
-                credits = if (isTeacherAccount) 500 else 100,
-                bio = if (isTeacherAccount) "Docente Titular en Escolaris 👨‍🏫" else "Estudiante activo en Escolaris 🚀",
-                avatarEmoji = if (isTeacherAccount) "👨‍🏫" else "🎓",
+                credits = if (isSuperAdmin) 1000 else if (isTeacherAccount) 500 else 100,
+                bio = if (isSuperAdmin) "Administrador Escolar & Docente Titular en Escolaris 👑" else if (isTeacherAccount) "Docente Titular en Escolaris 👨‍🏫" else "Estudiante activo en Escolaris 🚀",
+                avatarEmoji = if (isSuperAdmin) "👑" else if (isTeacherAccount) "👨‍🏫" else "🎓",
                 photoUri = firebaseUser.photoUrl?.toString(),
                 bannerGradientIndex = 0
             )

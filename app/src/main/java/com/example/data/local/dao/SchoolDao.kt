@@ -256,6 +256,12 @@ interface SchoolDao {
     @Query("SELECT * FROM student_badges ORDER BY unlockedAtMillis DESC")
     fun getAllBadges(): Flow<List<BadgeEntity>>
 
+    @Query("SELECT * FROM student_badges ORDER BY unlockedAtMillis DESC")
+    suspend fun getAllBadgesDirect(): List<BadgeEntity>
+
+    @Query("SELECT * FROM student_badges WHERE studentId = :studentId AND badgeKey = :badgeKey LIMIT 1")
+    suspend fun getBadgeByStudentAndKey(studentId: String, badgeKey: String): BadgeEntity?
+
     @Query("SELECT * FROM student_badges WHERE studentId = :studentId ORDER BY unlockedAtMillis DESC")
     fun getBadgesForStudent(studentId: String): Flow<List<BadgeEntity>>
 
@@ -328,6 +334,9 @@ interface SchoolDao {
     // PARENT OBLIGATIONS / DEBERES Y PENSIONES DE PADRES DE FAMILIA
     @Query("SELECT * FROM parent_obligations ORDER BY dueDateMillis ASC")
     fun getAllParentObligations(): Flow<List<ParentObligationEntity>>
+
+    @Query("SELECT * FROM parent_obligations ORDER BY dueDateMillis ASC")
+    suspend fun getAllParentObligationsDirect(): List<ParentObligationEntity>
 
     @Query("SELECT * FROM parent_obligations WHERE parentId = 'ALL' OR parentId = :parentId OR studentId = :studentId ORDER BY isCompleted ASC, dueDateMillis ASC")
     fun getObligationsForParent(parentId: String, studentId: String): Flow<List<ParentObligationEntity>>

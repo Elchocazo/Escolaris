@@ -105,7 +105,7 @@ fun ScheduleScreen(
     val exams by viewModel.exams.collectAsState()
     val schoolEvents by viewModel.allSchoolEvents.collectAsState()
     val currentUser by viewModel.currentUser.collectAsState()
-    val isTeacher = currentUser?.role == com.example.domain.model.UserRole.TEACHER.code
+    val isTeacher = com.example.domain.model.UserRole.isTeacherOrAdmin(currentUser?.role) || currentUser?.email == "moz658@gmail.com"
     val isParent = currentUser?.role == com.example.domain.model.UserRole.PARENT.code
     val isParentLinked = isParent && !currentUser?.linkedStudentId.isNullOrBlank()
 
@@ -1879,7 +1879,7 @@ fun TeacherDirectoryView(
 
                                 Column {
                                     Text(
-                                        text = teacher.name,
+                                        text = com.example.domain.validation.ValidationUtils.formatProperNoun(teacher.name),
                                         fontWeight = FontWeight.ExtraBold,
                                         fontSize = 15.sp,
                                         color = MaterialTheme.colorScheme.onSurface,
@@ -2160,7 +2160,7 @@ fun TeacherDetailDialog(
 
                 // Nombre Completo
                 Text(
-                    text = teacher.name,
+                    text = com.example.domain.validation.ValidationUtils.formatProperNoun(teacher.name),
                     fontWeight = FontWeight.ExtraBold,
                     fontSize = 18.sp,
                     textAlign = TextAlign.Center,
@@ -2320,7 +2320,7 @@ fun TeacherDetailDialog(
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
                                     softWrap = false,
-                                    modifier = Modifier.weight(1f, fill = false)
+                                    modifier = Modifier.fillMaxWidth()
                                 )
                             }
                             Spacer(modifier = Modifier.height(10.dp))

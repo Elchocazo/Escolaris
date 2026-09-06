@@ -91,7 +91,7 @@ fun ProfilePhotoViewerDialog(
                 Spacer(modifier = Modifier.height(16.dp))
 
                 Text(
-                    text = userName,
+                    text = com.example.domain.validation.ValidationUtils.formatProperNoun(userName),
                     fontWeight = FontWeight.ExtraBold,
                     style = MaterialTheme.typography.titleLarge,
                     color = MaterialTheme.colorScheme.onSurface
@@ -99,19 +99,23 @@ fun ProfilePhotoViewerDialog(
 
                 Spacer(modifier = Modifier.height(4.dp))
 
-                val roleText = when (userRole) {
-                    UserRole.TEACHER.code -> {
-                        val grade = gradeSection?.trim() ?: ""
-                        if (grade.isBlank() || grade.equals("Docente Titular", ignoreCase = true)) {
+                val cleanGrade = gradeSection?.replace(" - Sección A", "")?.trim() ?: ""
+                val isGeneralSubject = cleanGrade.equals("General", ignoreCase = true) || 
+                                       cleanGrade.equals("Colegio general", ignoreCase = true) ||
+                                       cleanGrade.equals("Colegio", ignoreCase = true)
+
+                val roleText = when {
+                    userRole == UserRole.ADMIN.code || userRole == "ADMIN" || userRole == "SUPERADMIN" -> "👑 Administrador Escolar"
+                    userRole == UserRole.TEACHER.code || userRole == "DOCENTE" -> {
+                        if (cleanGrade.isBlank() || isGeneralSubject || cleanGrade.equals("Docente Titular", ignoreCase = true)) {
                             "👨‍🏫 Docente Titular"
                         } else {
-                            "👨‍🏫 Docente • $grade"
+                            "👨‍🏫 Docente • $cleanGrade"
                         }
                     }
-                    UserRole.PARENT.code -> "👨‍👩‍👧 Padre de Familia"
+                    userRole == UserRole.PARENT.code -> "👨‍👩‍👧 Padre de Familia"
                     else -> {
-                        val cleanGrade = gradeSection?.replace(" - Sección A", "")?.trim() ?: ""
-                        if (cleanGrade.isNotBlank()) "🎓 $cleanGrade" else "🎓 Estudiante"
+                        if (cleanGrade.isNotBlank() && !isGeneralSubject) "🎓 $cleanGrade" else "🎓 Estudiante"
                     }
                 }
 

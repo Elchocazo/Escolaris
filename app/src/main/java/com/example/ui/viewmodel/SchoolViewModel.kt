@@ -83,6 +83,9 @@ class SchoolViewModel @JvmOverloads constructor(
         private const val PREF_SAVED_STUDENT_CODE = "saved_active_student_code"
         private const val PREF_SAVED_PHONE = "saved_active_user_phone"
         private const val PREF_SWITCHED_FROM_PARENT_ID = "switched_from_parent_id"
+        private const val PREF_SAVED_CREDITS = "saved_user_credits"
+        private const val PREF_SAVED_XP = "saved_user_xp"
+        private const val PREF_SAVED_PARENT_INCENTIVE = "saved_user_parent_incentive"
     }
 
     private fun getInitialCachedUser(): UserEntity? {
@@ -91,18 +94,25 @@ class SchoolViewModel @JvmOverloads constructor(
         val name = sessionPrefs.getString(PREF_SAVED_USER_NAME, "") ?: ""
         val role = sessionPrefs.getString(PREF_SAVED_USER_ROLE, "") ?: ""
         if (id.isBlank() || name.isBlank()) return null
+        val isTeacherOrAdmin = UserRole.isTeacherOrAdmin(role) || email == "moz658@gmail.com"
+        val savedCredits = sessionPrefs.getInt(PREF_SAVED_CREDITS, if (isTeacherOrAdmin) 500 else 100)
+        val savedXp = sessionPrefs.getInt(PREF_SAVED_XP, if (isTeacherOrAdmin) 200 else 50)
+        val savedIncentive = sessionPrefs.getInt(PREF_SAVED_PARENT_INCENTIVE, 100)
         return UserEntity(
             id = id,
             email = email,
             name = name,
             role = role,
-            gradeSection = sessionPrefs.getString(PREF_SAVED_USER_GRADE, if (role == "TEACHER") "Docente Titular" else "10° Grado") ?: (if (role == "TEACHER") "Docente Titular" else "10° Grado"),
-            avatarEmoji = sessionPrefs.getString(PREF_SAVED_USER_AVATAR, if (role == "TEACHER") "👨‍🏫" else "🎓") ?: "🎓",
+            gradeSection = sessionPrefs.getString(PREF_SAVED_USER_GRADE, if (isTeacherOrAdmin) "Docente Titular" else "10° Grado") ?: (if (isTeacherOrAdmin) "Docente Titular" else "10° Grado"),
+            avatarEmoji = sessionPrefs.getString(PREF_SAVED_USER_AVATAR, if (isTeacherOrAdmin) "👨‍🏫" else "🎓") ?: "🎓",
             avatarColorHex = sessionPrefs.getLong(PREF_SAVED_USER_COLOR, 0xFF2563EB),
             photoUri = sessionPrefs.getString(PREF_SAVED_USER_PHOTO, null),
             teacherCode = sessionPrefs.getString(PREF_SAVED_TEACHER_CODE, "")?.ifBlank { if (email == "moz658@gmail.com") "DOC-102938" else "" } ?: "",
             studentCode = sessionPrefs.getString(PREF_SAVED_STUDENT_CODE, "") ?: "",
-            phoneNumber = sessionPrefs.getString(PREF_SAVED_PHONE, "") ?: ""
+            phoneNumber = sessionPrefs.getString(PREF_SAVED_PHONE, "") ?: "",
+            credits = savedCredits,
+            xp = savedXp,
+            parentIncentiveCredits = savedIncentive
         )
     }
 
@@ -350,6 +360,9 @@ class SchoolViewModel @JvmOverloads constructor(
             .putString(PREF_SAVED_TEACHER_CODE, user.teacherCode)
             .putString(PREF_SAVED_STUDENT_CODE, user.studentCode)
             .putString(PREF_SAVED_PHONE, user.phoneNumber)
+            .putInt(PREF_SAVED_CREDITS, user.credits)
+            .putInt(PREF_SAVED_XP, user.xp)
+            .putInt(PREF_SAVED_PARENT_INCENTIVE, user.parentIncentiveCredits)
             .apply()
     }
 
@@ -614,7 +627,7 @@ class SchoolViewModel @JvmOverloads constructor(
                 return@launch
             }
 
-            val isTeacher = user.role == UserRole.TEACHER.code
+            val isTeacher = UserRole.isTeacherOrAdmin(user.role) || user.email == "moz658@gmail.com"
             val cleanTitle = title.trim()
             val cleanContent = content.trim()
             val shortContent = if (cleanContent.length > 100) cleanContent.take(100) + "..." else cleanContent
@@ -647,7 +660,7 @@ class SchoolViewModel @JvmOverloads constructor(
             val post = FeedPostEntity(
                 id = postId,
                 authorId = user.id,
-                authorName = "$properAuthorName (${if (isTeacher) "Docente" else "Estudiante"})",
+                authorName = properAuthorName,
                 authorRole = user.role,
                 authorAvatarColorHex = user.avatarColorHex,
                 title = cleanTitle,
@@ -700,7 +713,7 @@ class SchoolViewModel @JvmOverloads constructor(
                 val postDoc = hashMapOf(
                     "id" to postId,
                     "authorId" to user.id,
-                    "authorName" to "$properAuthorName (${if (isTeacher) "Docente" else "Estudiante"})",
+                    "authorName" to properAuthorName,
                     "authorRole" to user.role,
                     "authorAvatarColorHex" to user.avatarColorHex,
                     "title" to cleanTitle,
@@ -848,6 +861,15 @@ class SchoolViewModel @JvmOverloads constructor(
             if (newStatus == TaskStatus.COMPLETED.code) {
                 NotificationHelper.cancelTaskReminder(getApplication(), task.id)
                 repository.addCreditsAndXp(task.studentId, task.rewardCredits, 75)
+                try {
+                    val store = FirebaseFirestore.getInstance()
+                    store.collection("users").document(task.studentId).update(
+                        "credits", com.google.firebase.firestore.FieldValue.increment(task.rewardCredits.toLong()),
+                        "xp", com.google.firebase.firestore.FieldValue.increment(75L)
+                    )
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
                 loadActiveUser(_currentUserId.value)
                 _userMessage.value = "🎉 ¡Tarea completada! Ganaste +${task.rewardCredits} créditos y +75 XP"
             } else {
@@ -858,6 +880,17 @@ class SchoolViewModel @JvmOverloads constructor(
                     title = task.title,
                     dueDateMillis = task.dueDateMillis
                 )
+                repository.addCreditsAndXp(task.studentId, -task.rewardCredits, -75)
+                try {
+                    val store = FirebaseFirestore.getInstance()
+                    store.collection("users").document(task.studentId).update(
+                        "credits", com.google.firebase.firestore.FieldValue.increment(-task.rewardCredits.toLong()),
+                        "xp", com.google.firebase.firestore.FieldValue.increment(-75L)
+                    )
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+                loadActiveUser(_currentUserId.value)
                 _userMessage.value = "Tarea marcada como pendiente"
             }
         }
@@ -1264,7 +1297,7 @@ class SchoolViewModel @JvmOverloads constructor(
                     "unlockedAtMillis" to System.currentTimeMillis(),
                     "status" to "ACTIVE"
                 )
-                store.collection("badges").add(badgeDoc)
+                store.collection("badges").document("${studentId}_${badgeKey}").set(badgeDoc, SetOptions.merge())
 
                 val studentDoc = store.collection("users").document(studentId).get().await()
                 if (studentDoc.exists()) {
@@ -1684,9 +1717,12 @@ class SchoolViewModel @JvmOverloads constructor(
                         val childNewXp = (child.xp + deltaXp).coerceAtLeast(0)
                         repository.updateUser(child.copy(credits = childNewCredits, xp = childNewXp))
                         try {
-                            FirebaseFirestore.getInstance().collection("users").document(child.id).update(
-                                "credits", childNewCredits,
-                                "xp", childNewXp
+                            FirebaseFirestore.getInstance().collection("users").document(child.id).set(
+                                mapOf(
+                                    "credits" to childNewCredits,
+                                    "xp" to childNewXp
+                                ),
+                                SetOptions.merge()
                             )
                         } catch (e: Exception) {
                             e.printStackTrace()
@@ -1696,10 +1732,13 @@ class SchoolViewModel @JvmOverloads constructor(
 
                 try {
                     val store = FirebaseFirestore.getInstance()
-                    store.collection("users").document(u.id).update(
-                        "credits", newCredits,
-                        "xp", newXp,
-                        "parentIncentiveCredits", newIncentive
+                    store.collection("users").document(u.id).set(
+                        mapOf(
+                            "credits" to newCredits,
+                            "xp" to newXp,
+                            "parentIncentiveCredits" to newIncentive
+                        ),
+                        SetOptions.merge()
                     )
                 } catch (e: Exception) {
                     e.printStackTrace()
@@ -2069,12 +2108,16 @@ class SchoolViewModel @JvmOverloads constructor(
                 )
             }
 
-            // 3. Sincronizar Medallas de Honor
+            // 3. Sincronizar Medallas de Honor (Anti-duplicación)
             val badgesSnapshot = store.collection("badges").get().await()
+            val existingBadgeKeys = repository.getAllBadgesDirect().map { "${it.studentId}_${it.badgeKey}" }.toSet()
             for (doc in badgesSnapshot.documents) {
                 val sId = doc.getString("studentId") ?: continue
                 val sName = doc.getString("studentName") ?: "Estudiante"
                 val key = doc.getString("badgeKey") ?: doc.id
+                if ("${sId}_${key}" in existingBadgeKeys) {
+                    continue // Ya existe localmente, no duplicar
+                }
                 val title = doc.getString("title") ?: "Insignia de Honor"
                 val desc = doc.getString("description") ?: ""
                 val emoji = doc.getString("emoji") ?: "🎖️"
@@ -2101,6 +2144,95 @@ class SchoolViewModel @JvmOverloads constructor(
                         photoUri = photo
                     )
                 )
+            }
+
+            // 3.1 Sincronizar Obligaciones y Pensiones de Padres (parent_obligations)
+            try {
+                val obligationsSnapshot = store.collection("parent_obligations").get().await()
+                val existingObligations = repository.getAllParentObligationsDirect()
+                for (doc in obligationsSnapshot.documents) {
+                    val oId = doc.getLong("id") ?: doc.id.toLongOrNull() ?: continue
+                    val parentId = doc.getString("parentId") ?: "ALL"
+                    val studentId = doc.getString("studentId") ?: "ALL"
+                    val title = doc.getString("title") ?: "Obligación Escolar"
+                    val description = doc.getString("description") ?: ""
+                    val category = doc.getString("category") ?: "PENSION"
+                    val month = doc.getString("month") ?: "Septiembre"
+                    val dueDayOfMonth = (doc.getLong("dueDayOfMonth") ?: 5L).toInt()
+                    val dueDateMillis = doc.getLong("dueDateMillis") ?: System.currentTimeMillis()
+                    val isCompleted = doc.getBoolean("isCompleted") ?: false
+                    val completedAtMillis = doc.getLong("completedAtMillis")
+                    val completedByParentName = doc.getString("completedByParentName") ?: ""
+                    val rewardBadgeKey = doc.getString("rewardBadgeKey") ?: ""
+                    val rewardBadgeTitle = doc.getString("rewardBadgeTitle") ?: ""
+                    val rewardBadgeEmoji = doc.getString("rewardBadgeEmoji") ?: "🎖️"
+                    val rewardCredits = (doc.getLong("rewardCredits") ?: 100L).toInt()
+                    val rewardXp = (doc.getLong("rewardXp") ?: 150L).toInt()
+                    val whatsappMessage = doc.getString("whatsappMessage") ?: ""
+                    val createdByTeacher = doc.getString("createdByTeacher") ?: "Docente Titular"
+
+                    val entity = ParentObligationEntity(
+                        id = oId,
+                        parentId = parentId,
+                        studentId = studentId,
+                        title = title,
+                        description = description,
+                        category = category,
+                        month = month,
+                        dueDayOfMonth = dueDayOfMonth,
+                        dueDateMillis = dueDateMillis,
+                        isCompleted = isCompleted,
+                        completedAtMillis = completedAtMillis,
+                        completedByParentName = completedByParentName,
+                        rewardBadgeKey = rewardBadgeKey,
+                        rewardBadgeTitle = rewardBadgeTitle,
+                        rewardBadgeEmoji = rewardBadgeEmoji,
+                        rewardCredits = rewardCredits,
+                        rewardXp = rewardXp,
+                        whatsappMessage = whatsappMessage,
+                        createdByTeacher = createdByTeacher
+                    )
+                    repository.insertParentObligation(entity)
+                }
+
+                // Si hay obligaciones locales que no están en la nube, subirlas a Firestore
+                val liveObligations = repository.getAllParentObligationsDirect()
+                if (liveObligations.isNotEmpty()) {
+                    EscolarisBackupManager.saveParentObligationsBackup(getApplication(), liveObligations)
+                    for (lo in liveObligations) {
+                        val inCloud = obligationsSnapshot.documents.any { (it.getLong("id") ?: it.id.toLongOrNull()) == lo.id }
+                        if (!inCloud) {
+                            try {
+                                val oblMap = hashMapOf(
+                                    "id" to lo.id,
+                                    "parentId" to lo.parentId,
+                                    "studentId" to lo.studentId,
+                                    "title" to lo.title,
+                                    "description" to lo.description,
+                                    "category" to lo.category,
+                                    "month" to lo.month,
+                                    "dueDayOfMonth" to lo.dueDayOfMonth,
+                                    "dueDateMillis" to lo.dueDateMillis,
+                                    "isCompleted" to lo.isCompleted,
+                                    "completedAtMillis" to lo.completedAtMillis,
+                                    "completedByParentName" to lo.completedByParentName,
+                                    "rewardBadgeKey" to lo.rewardBadgeKey,
+                                    "rewardBadgeTitle" to lo.rewardBadgeTitle,
+                                    "rewardBadgeEmoji" to lo.rewardBadgeEmoji,
+                                    "rewardCredits" to lo.rewardCredits,
+                                    "rewardXp" to lo.rewardXp,
+                                    "whatsappMessage" to lo.whatsappMessage,
+                                    "createdByTeacher" to lo.createdByTeacher
+                                )
+                                store.collection("parent_obligations").document(lo.id.toString()).set(oblMap, SetOptions.merge())
+                            } catch (e: Exception) {
+                                e.printStackTrace()
+                            }
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
             }
 
             // 4. Sincronizar Publicaciones del Muro Social (feed_posts)
@@ -2360,6 +2492,32 @@ class SchoolViewModel @JvmOverloads constructor(
 
             val id = repository.insertParentObligation(obligation)
 
+            try {
+                val store = FirebaseFirestore.getInstance()
+                val oblMap = hashMapOf(
+                    "id" to id,
+                    "parentId" to obligation.parentId,
+                    "studentId" to obligation.studentId,
+                    "title" to obligation.title,
+                    "description" to obligation.description,
+                    "category" to obligation.category,
+                    "month" to obligation.month,
+                    "dueDayOfMonth" to obligation.dueDayOfMonth,
+                    "dueDateMillis" to obligation.dueDateMillis,
+                    "isCompleted" to false,
+                    "rewardBadgeKey" to obligation.rewardBadgeKey,
+                    "rewardBadgeTitle" to obligation.rewardBadgeTitle,
+                    "rewardBadgeEmoji" to obligation.rewardBadgeEmoji,
+                    "rewardCredits" to obligation.rewardCredits,
+                    "rewardXp" to obligation.rewardXp,
+                    "whatsappMessage" to obligation.whatsappMessage,
+                    "createdByTeacher" to obligation.createdByTeacher
+                )
+                store.collection("parent_obligations").document(id.toString()).set(oblMap, SetOptions.merge())
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+
             // Programar recordatorios automáticos (diario 2:00 PM los primeros 5 días, luego cada 3 días)
             if (category == "PENSION") {
                 NotificationHelper.scheduleParentPensionReminder(
@@ -2442,17 +2600,37 @@ class SchoolViewModel @JvmOverloads constructor(
                     "unlockedAtMillis" to System.currentTimeMillis(),
                     "status" to "ACTIVE"
                 )
-                store.collection("badges").add(badgeDoc)
+                val badgeKey = obligation.rewardBadgeKey.ifBlank { "OBLIGATION_${obligation.id}" }
+                store.collection("badges").document("${targetStudentId}_${badgeKey}").set(badgeDoc, SetOptions.merge())
+
+                store.collection("parent_obligations").document(obligation.id.toString()).set(
+                    mapOf(
+                        "isCompleted" to true,
+                        "completedAtMillis" to System.currentTimeMillis(),
+                        "completedByParentName" to parent.name
+                    ),
+                    SetOptions.merge()
+                )
 
                 val studentDoc = store.collection("users").document(targetStudentId).get().await()
-                if (studentDoc.exists()) {
-                    val currCredits = (studentDoc.getLong("credits") ?: 100L).toInt()
-                    val currXp = (studentDoc.getLong("xp") ?: 50L).toInt()
-                    store.collection("users").document(targetStudentId).update(
-                        "credits", currCredits + obligation.rewardCredits,
-                        "xp", currXp + obligation.rewardXp
-                    )
-                }
+                val currCredits = if (studentDoc.exists()) (studentDoc.getLong("credits") ?: 100L).toInt() else 0
+                val currXp = if (studentDoc.exists()) (studentDoc.getLong("xp") ?: 50L).toInt() else 0
+                store.collection("users").document(targetStudentId).set(
+                    mapOf(
+                        "credits" to currCredits + obligation.rewardCredits,
+                        "xp" to currXp + obligation.rewardXp
+                    ),
+                    SetOptions.merge()
+                )
+
+                // Sync updated parent incentive credits to Firestore
+                store.collection("users").document(parent.id).set(
+                    mapOf(
+                        "credits" to parent.credits + obligation.rewardCredits,
+                        "parentIncentiveCredits" to parent.parentIncentiveCredits + obligation.rewardCredits
+                    ),
+                    SetOptions.merge()
+                )
             } catch (e: Exception) {
                 e.printStackTrace()
             }
@@ -2485,6 +2663,12 @@ class SchoolViewModel @JvmOverloads constructor(
         viewModelScope.launch {
             NotificationHelper.cancelParentPensionReminder(getApplication(), obligation.id)
             repository.deleteParentObligation(obligation)
+            try {
+                val store = FirebaseFirestore.getInstance()
+                store.collection("parent_obligations").document(obligation.id.toString()).delete()
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
             _userMessage.value = "Obligación de padres eliminada"
         }
     }
@@ -2613,17 +2797,20 @@ class SchoolViewModel @JvmOverloads constructor(
                         "unlockedAtMillis" to System.currentTimeMillis(),
                         "status" to "ACTIVE"
                     )
-                    store.collection("badges").add(badgeDoc)
+                    store.collection("badges").document("${user.id}_${badgeKey}").set(badgeDoc, com.google.firebase.firestore.SetOptions.merge())
 
                     val userDoc = store.collection("users").document(user.id).get().await()
-                    if (userDoc.exists()) {
-                        val currCredits = (userDoc.getLong("credits") ?: 100L).toInt()
-                        val currXp = (userDoc.getLong("xp") ?: 50L).toInt()
-                        store.collection("users").document(user.id).update(
-                            "credits", currCredits + creditReward,
-                            "xp", currXp + xpReward
-                        )
+                    val currCredits = if (userDoc.exists()) (userDoc.getLong("credits") ?: user.credits.toLong()).toInt() else user.credits
+                    val currXp = if (userDoc.exists()) (userDoc.getLong("xp") ?: user.xp.toLong()).toInt() else user.xp
+                    val userUpdates = mutableMapOf<String, Any>(
+                        "credits" to currCredits + creditReward,
+                        "xp" to currXp + xpReward
+                    )
+                    if (user.role == "PARENT") {
+                        val currIncentive = if (userDoc.exists()) (userDoc.getLong("parentIncentiveCredits") ?: user.parentIncentiveCredits.toLong()).toInt() else user.parentIncentiveCredits
+                        userUpdates["parentIncentiveCredits"] = currIncentive + creditReward
                     }
+                    store.collection("users").document(user.id).set(userUpdates, com.google.firebase.firestore.SetOptions.merge())
                 } catch (e: Exception) {
                     e.printStackTrace()
                 }

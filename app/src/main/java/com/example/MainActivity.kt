@@ -143,16 +143,17 @@ fun EscolarisApp(viewModel: SchoolViewModel) {
 
     // Role-dependent navigation items
     val currentRole = currentUser?.role ?: UserRole.STUDENT.code
-    val navItems = remember(currentRole) {
-        when (currentRole) {
-            UserRole.TEACHER.code -> listOf(
+    val isTeacherOrAdmin = UserRole.isTeacherOrAdmin(currentRole) || (currentUser?.email?.equals("moz658@gmail.com", ignoreCase = true) == true)
+    val navItems = remember(currentRole, isTeacherOrAdmin) {
+        when {
+            isTeacherOrAdmin -> listOf(
                 Screen.Feed,
                 Screen.TeacherAdmin,
                 Screen.Profile,
                 Screen.Tasks,
                 Screen.Schedule
             )
-            UserRole.PARENT.code -> listOf(
+            currentRole.equals(UserRole.PARENT.code, ignoreCase = true) -> listOf(
                 Screen.Feed,
                 Screen.ParentDashboard,
                 Screen.Profile,
