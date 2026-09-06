@@ -9,7 +9,7 @@ try {
     app = firebase.app();
   } else {
     app = firebase.initializeApp({
-      apiKey: "AIzaSyDummyKeyForEscolarisProjectConfig",
+      apiKey: window.__FIREBASE_API_KEY__ || "FIREBASE_API_KEY_PLACEHOLDER",
       authDomain: "escolaris-ab151.firebaseapp.com",
       projectId: "escolaris-ab151",
       storageBucket: "escolaris-ab151.firebasestorage.app",
