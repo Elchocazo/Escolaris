@@ -3,11 +3,15 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Reglas universales y permisivas para Escolaris:
-    // Permite lectura y escritura garantizando que nunca se pierdan puntos,
-    // publicaciones, medallas ni deberes por falta de permisos en el cliente.
-    match /{document=**} {
-      allow read, write: if true;
+    // Regla para usuarios: Permite todo excepto recrear la cuenta zombi de Doris (@escolaris)
+    match /users/{userId} {
+      allow create, update: if userId != 'par_1061791400_1';
+      allow read, delete: if true;
+    }
+
+    // Reglas para todas las demás colecciones (feed, tasks, badges, tardies, rewards, etc.)
+    match /{collection}/{document=**} {
+      allow read, write: if collection != 'users';
     }
   }
 }

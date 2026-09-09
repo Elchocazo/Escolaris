@@ -707,7 +707,9 @@ function setupDataListeners() {
     renderAdminUsers();
     renderRoleSpecificScreens();
     populateStudentSelects();
-    seedInstitutionalUsers();
+    if (allUsers.length === 0) {
+      seedInstitutionalUsers();
+    }
     renderFeed(); // Actualiza preview de ranking en el lateral del muro
   }, (err) => {
     console.error("Error detallado en Users listener:", err);
@@ -1345,26 +1347,6 @@ const OFFICIAL_INSTITUTIONAL_ROSTER = [
     phoneNumber: "3217510339",
     roleConfigured: true
   },
-  {
-    id: "par_1061791400_1",
-    name: "Doris Stella Navia",
-    email: "doris.navia1061791400@escolaris.edu.co",
-    role: "PARENT",
-    studentCode: "",
-    gradeSection: "Padre/Tutor de Emily Daniela Caicedo",
-    credits: 100,
-    parentIncentiveCredits: 100,
-    xp: 50,
-    level: 1,
-    streakDays: 1,
-    avatarColorHex: 0xFF059669,
-    avatarEmoji: "👨‍👩‍👧",
-    avatarInitials: "DN",
-    linkedStudentId: "std_1061791400",
-    bio: "Acudiente de Emily Daniela Caicedo Navia | Tel: 321 7510339 | Calle 3 No. 26-24 barrio Camilo Torres",
-    phoneNumber: "3217510339",
-    roleConfigured: true
-  },
   // 13. Valeria Orozco Gutiérrez & Acudiente
   {
     id: "std_1166464830",
@@ -1525,17 +1507,14 @@ const OFFICIAL_INSTITUTIONAL_ROSTER = [
 async function seedInstitutionalUsers() {
   try {
     if (!db) return;
-    const existingEmails = new Set(allUsers.map(u => (u.email || '').toLowerCase().trim()).filter(Boolean));
-    const existingIds = new Set(allUsers.map(u => u.id));
+    // Cloud Firestore es la Fuente Única de Verdad: NUNCA sembrar si ya existen usuarios
+    if (allUsers && allUsers.length > 0) return;
+    
     for (const u of OFFICIAL_INSTITUTIONAL_ROSTER) {
-      const cleanEmail = (u.email || '').toLowerCase().trim();
-      const alreadyExists = existingIds.has(u.id) || (cleanEmail && existingEmails.has(cleanEmail));
-      if (!alreadyExists) {
-        await db.collection('users').doc(u.id).set({
-          ...u,
-          createdAt: firebase.firestore.FieldValue.serverTimestamp()
-        }, { merge: true });
-      }
+      await db.collection('users').doc(u.id).set({
+        ...u,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      }, { merge: true });
     }
   } catch (e) {
     console.warn("Seed institutional users error:", e);
@@ -3518,13 +3497,62 @@ async function handleUpdateUser(e) {
 }
 
 async function handleDeleteUser(userId, userName) {
-  if (confirm(`⚠️ ¿Estás seguro de que deseas eliminar permanentemente a "${userName}" de la plataforma Escolaris?\n\nEsta acción no se puede deshacer.`)) {
-    try {
-      await db.collection('users').doc(userId).delete();
-      showToast(`🗑️ Usuario "${userName}" eliminado.`);
-    } catch (err) {
-      alert("Error al eliminar usuario: " + err.message);
+  if (!confirm(`⚠️ ¿Estás seguro de que deseas eliminar permanentemente a "${userName}" de la plataforma Escolaris?\n\nEsta acción no se puede deshacer y borrará sus registros de la nube.`)) {
+    return;
+  }
+  try {
+    // 1. Eliminar subcolecciones asociadas si existen (user_badges, notifications, badges)
+    const subcollections = ['user_badges', 'notifications', 'badges'];
+    for (const sub of subcollections) {
+      try {
+        const subSnap = await db.collection('users').doc(userId).collection(sub).get();
+        if (!subSnap.empty) {
+          const batch = db.batch();
+          subSnap.forEach(d => batch.delete(d.ref));
+          await batch.commit();
+        }
+      } catch (subErr) {
+        console.warn(`Aviso al limpiar subcolección ${sub}:`, subErr);
+      }
     }
+
+    // 2. Eliminar notificaciones en la colección raíz asociadas a este usuario
+    try {
+      const notifsSnap = await db.collection('notifications').where('studentId', '==', userId).get();
+      if (!notifsSnap.empty) {
+        const batch = db.batch();
+        notifsSnap.forEach(d => batch.delete(d.ref));
+        await batch.commit();
+      }
+    } catch (nErr) {
+      console.warn("Aviso al limpiar notificaciones del usuario:", nErr);
+    }
+
+    // 3. Desvincular referencias de acudiente o hijo si existen
+    try {
+      const linkedParents = allUsers.filter(u => u.linkedStudentId === userId);
+      for (const p of linkedParents) {
+        await db.collection('users').doc(p.id).update({
+          linkedStudentId: firebase.firestore.FieldValue.delete()
+        });
+      }
+    } catch (linkErr) {
+      console.warn("Aviso al desvincular estudiante de acudientes:", linkErr);
+    }
+
+    // 4. Ejecutar borrado real y definitivo en Cloud Firestore
+    await db.collection('users').doc(userId).delete();
+
+    // 5. Actualización optimista de estado local en memoria
+    allUsers = allUsers.filter(u => u.id !== userId);
+    renderAdminUsers();
+    renderLeaderboard();
+    populateStudentSelects();
+
+    showToast(`🗑️ Usuario "${userName}" eliminado permanentemente de la nube.`);
+  } catch (err) {
+    console.error("Error al eliminar usuario en Firestore:", err);
+    alert("❌ Error de permisos o conectividad al eliminar usuario:\n" + (err.message || err));
   }
 }
 

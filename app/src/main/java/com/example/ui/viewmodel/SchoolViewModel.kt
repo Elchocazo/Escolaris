@@ -475,19 +475,26 @@ class SchoolViewModel @JvmOverloads constructor(
     }
 
     fun deleteUser(user: UserEntity) {
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             val current = _currentUser.value
             if (current?.id == user.id) {
-                _userMessage.value = "⚠️ No puedes eliminar tu propio usuario en sesión activa"
+                withContext(Dispatchers.Main) {
+                    _userMessage.value = "⚠️ No puedes eliminar tu propio usuario en sesión activa"
+                }
                 return@launch
             }
-            repository.deleteUser(user)
             try {
-                FirebaseFirestore.getInstance().collection("users").document(user.id).delete()
+                FirebaseFirestore.getInstance().collection("users").document(user.id).delete().await()
+                repository.deleteUser(user)
+                withContext(Dispatchers.Main) {
+                    _userMessage.value = "🗑️ Cuenta de '${user.name}' (${user.role}) eliminada correctamente de la nube"
+                }
             } catch (e: Exception) {
                 e.printStackTrace()
+                withContext(Dispatchers.Main) {
+                    _userMessage.value = "❌ Error al eliminar usuario en Firestore: ${e.message}"
+                }
             }
-            _userMessage.value = "🗑️ Cuenta de '${user.name}' (${user.role}) eliminada correctamente"
         }
     }
 
@@ -2153,14 +2160,9 @@ class SchoolViewModel @JvmOverloads constructor(
             }
             if (existingIdsInFirestore.isNotEmpty()) {
                 repository.pruneUsers(existingIdsInFirestore.toList())
-            }
-
-            // 1.1 Sincronizar hacia Cloud Firestore los perfiles institucionales si no existen en la nube
-            for (institutionalUser in DatabaseInitializer.OFFICIAL_INSTITUTIONAL_ROSTER) {
-                val cleanEmail = institutionalUser.email.trim().lowercase()
-                val alreadyInCloud = existingIdsInFirestore.contains(institutionalUser.id) ||
-                    (cleanEmail.isNotBlank() && existingEmailsInFirestore.contains(cleanEmail))
-                if (!alreadyInCloud) {
+            } else {
+                // 1.1 Sincronizar perfiles institucionales ÚNICAMENTE si la colección remota está 100% vacía (primer arranque institucional)
+                for (institutionalUser in DatabaseInitializer.OFFICIAL_INSTITUTIONAL_ROSTER) {
                     try {
                         val firestoreData = hashMapOf(
                             "id" to institutionalUser.id,
@@ -2202,25 +2204,6 @@ class SchoolViewModel @JvmOverloads constructor(
                         repository.insertUser(institutionalUser)
                     } catch (e: Exception) {
                         e.printStackTrace()
-                    }
-                } else {
-                    val cloudDoc = usersSnapshot.documents.find { it.id == institutionalUser.id }
-                    if (cloudDoc != null) {
-                        val cloudEmail = cloudDoc.getString("email")?.trim()?.lowercase() ?: ""
-                        val cloudLinked = cloudDoc.getString("linkedStudentId")
-                        if (cloudEmail != institutionalUser.email.trim().lowercase() || (institutionalUser.linkedStudentId != null && cloudLinked != institutionalUser.linkedStudentId)) {
-                            try {
-                                store.collection("users").document(institutionalUser.id).set(
-                                    mapOf(
-                                        "email" to institutionalUser.email,
-                                        "linkedStudentId" to (institutionalUser.linkedStudentId ?: cloudLinked)
-                                    ),
-                                    SetOptions.merge()
-                                ).await()
-                            } catch (e: Exception) {
-                                e.printStackTrace()
-                            }
-                        }
                     }
                 }
             }

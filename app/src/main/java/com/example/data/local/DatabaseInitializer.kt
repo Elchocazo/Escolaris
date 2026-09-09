@@ -1261,25 +1261,6 @@ object DatabaseInitializer {
             avatarEmoji = "🎓",
             phoneNumber = "3217510339"
         ),
-        UserEntity(
-            id = "par_1061791400_1",
-            name = "Doris Stella Navia",
-            email = "doris.navia1061791400@escolaris.edu.co",
-            role = "PARENT",
-            studentCode = "",
-            avatarColorHex = 0xFF059669,
-            avatarInitials = "DN",
-            gradeSection = "Padre/Tutor de Emily Daniela Caicedo",
-            streakDays = 1,
-            xp = 50,
-            level = 1,
-            credits = 100,
-            parentIncentiveCredits = 100,
-            linkedStudentId = "std_1061791400",
-            bio = "Acudiente de Emily Daniela Caicedo Navia | Tel: 321 7510339 | Calle 3 No. 26-24 barrio Camilo Torres",
-            avatarEmoji = "👨‍👩‍👧",
-            phoneNumber = "3217510339"
-        ),
 
         // ==========================================
         // 13. VALERIA OROZCO GUTIÉRREZ & ACUDIENTE
