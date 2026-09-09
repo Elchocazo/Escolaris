@@ -45,7 +45,7 @@ interface SchoolDao {
     @Query("SELECT * FROM users WHERE UPPER(studentCode) = UPPER(:code) AND role = 'STUDENT' LIMIT 1")
     suspend fun getUserByStudentCode(code: String): UserEntity?
 
-    @Query("SELECT * FROM users WHERE role = 'STUDENT' ORDER BY xp DESC")
+    @Query("SELECT * FROM users WHERE role = 'STUDENT' ORDER BY xp DESC, credits DESC")
     fun getLeaderboardStudents(): Flow<List<UserEntity>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
@@ -53,6 +53,9 @@ interface SchoolDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertUsers(users: List<UserEntity>)
+
+    @Query("DELETE FROM users WHERE id NOT IN (:validIds)")
+    suspend fun pruneUsers(validIds: List<String>)
 
     @Update
     suspend fun updateUser(user: UserEntity)
@@ -100,6 +103,12 @@ interface SchoolDao {
     @Query("DELETE FROM feed_posts WHERE id = :postId")
     suspend fun deleteFeedPost(postId: Long)
 
+    @Query("DELETE FROM feed_posts")
+    suspend fun deleteAllFeedPosts()
+
+    @Query("DELETE FROM feed_posts WHERE id NOT IN (:validIds)")
+    suspend fun deleteFeedPostsNotIn(validIds: List<Long>)
+
     // COMMENTS
     @Query("SELECT * FROM post_comments WHERE postId = :postId ORDER BY timestamp ASC")
     fun getCommentsForPost(postId: Long): Flow<List<PostCommentEntity>>
@@ -113,12 +122,36 @@ interface SchoolDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertComments(comments: List<PostCommentEntity>)
 
+    @Query("DELETE FROM post_comments WHERE id = :commentId")
+    suspend fun deleteCommentById(commentId: Long)
+
+    @Query("DELETE FROM post_comments WHERE postId = :postId")
+    suspend fun deleteCommentsByPostId(postId: Long)
+
+    @Query("DELETE FROM post_comments")
+    suspend fun deleteAllComments()
+
+    @Query("DELETE FROM post_comments WHERE id NOT IN (:validIds)")
+    suspend fun deleteCommentsNotIn(validIds: List<Long>)
+
     @Query("UPDATE feed_posts SET commentsCount = commentsCount + 1 WHERE id = :postId")
     suspend fun incrementCommentCount(postId: Long)
+
+    @Query("UPDATE feed_posts SET commentsCount = CASE WHEN commentsCount > 0 THEN commentsCount - 1 ELSE 0 END WHERE id = :postId")
+    suspend fun decrementCommentCount(postId: Long)
 
     // TASKS / HOMEWORK
     @Query("SELECT * FROM tasks ORDER BY dueDateMillis ASC")
     fun getAllTasks(): Flow<List<TaskEntity>>
+
+    @Query("SELECT * FROM tasks")
+    suspend fun getAllTasksDirect(): List<TaskEntity>
+
+    @Query("SELECT * FROM tasks WHERE firestoreId = :firestoreId LIMIT 1")
+    suspend fun getTaskByFirestoreId(firestoreId: String): TaskEntity?
+
+    @Query("SELECT * FROM tasks WHERE id = :id LIMIT 1")
+    suspend fun getTaskByIdDirect(id: Long): TaskEntity?
 
     @Query("SELECT * FROM tasks WHERE studentId = :studentId ORDER BY dueDateMillis ASC")
     fun getTasksForStudent(studentId: String): Flow<List<TaskEntity>>
@@ -132,11 +165,23 @@ interface SchoolDao {
     @Update
     suspend fun updateTask(task: TaskEntity)
 
-    @Query("UPDATE tasks SET status = :status WHERE id = :taskId")
+    @Query("UPDATE tasks SET status = :status, completed = :completed WHERE id = :taskId")
+    suspend fun updateTaskStatusWithCompleted(taskId: Long, status: String, completed: Boolean)
+
+    @Query("UPDATE tasks SET status = :status, completed = CASE WHEN :status = 'COMPLETED' THEN 1 ELSE 0 END WHERE id = :taskId")
     suspend fun updateTaskStatus(taskId: Long, status: String)
 
     @Delete
     suspend fun deleteTask(task: TaskEntity)
+
+    @Query("DELETE FROM tasks WHERE id = :id")
+    suspend fun deleteTaskById(id: Long)
+
+    @Query("DELETE FROM tasks WHERE firestoreId = :firestoreId")
+    suspend fun deleteTaskByFirestoreId(firestoreId: String)
+
+    @Query("DELETE FROM tasks WHERE firestoreId NOT IN (:validFirestoreIds) AND firestoreId != ''")
+    suspend fun pruneTasks(validFirestoreIds: List<String>)
 
     // EXAMS
     @Query("SELECT * FROM exams ORDER BY examDateMillis DESC")
@@ -237,6 +282,15 @@ interface SchoolDao {
     @Query("SELECT * FROM tardy_records ORDER BY dateMillis DESC")
     fun getAllTardyRecords(): Flow<List<TardyRecordEntity>>
 
+    @Query("SELECT * FROM tardy_records")
+    suspend fun getAllTardyRecordsDirect(): List<TardyRecordEntity>
+
+    @Query("SELECT * FROM tardy_records WHERE firestoreId = :firestoreId LIMIT 1")
+    suspend fun getTardyRecordByFirestoreId(firestoreId: String): TardyRecordEntity?
+
+    @Query("SELECT * FROM tardy_records WHERE id = :id LIMIT 1")
+    suspend fun getTardyRecordByIdDirect(id: Long): TardyRecordEntity?
+
     @Query("SELECT * FROM tardy_records WHERE studentId = :studentId ORDER BY dateMillis DESC")
     fun getTardyRecordsForStudent(studentId: String): Flow<List<TardyRecordEntity>>
 
@@ -251,6 +305,15 @@ interface SchoolDao {
 
     @Delete
     suspend fun deleteTardyRecord(record: TardyRecordEntity)
+
+    @Query("DELETE FROM tardy_records WHERE id = :id")
+    suspend fun deleteTardyRecordById(id: Long)
+
+    @Query("DELETE FROM tardy_records WHERE firestoreId = :firestoreId")
+    suspend fun deleteTardyRecordByFirestoreId(firestoreId: String)
+
+    @Query("DELETE FROM tardy_records WHERE firestoreId NOT IN (:validFirestoreIds) AND firestoreId != ''")
+    suspend fun pruneTardies(validFirestoreIds: List<String>)
 
     // STUDENT BADGES / INSIGNIAS
     @Query("SELECT * FROM student_badges ORDER BY unlockedAtMillis DESC")
@@ -271,11 +334,17 @@ interface SchoolDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertBadges(badges: List<BadgeEntity>)
 
+    @Query("DELETE FROM student_badges WHERE (studentId || '_' || badgeKey) NOT IN (:validKeys)")
+    suspend fun pruneBadges(validKeys: List<String>)
+
     @Delete
     suspend fun deleteBadge(badge: BadgeEntity)
 
     @Query("DELETE FROM student_badges WHERE id = :id")
     suspend fun deleteBadgeById(id: Long)
+
+    @Query("DELETE FROM student_badges")
+    suspend fun clearAllBadges()
 
     // SUBJECTS / ASIGNATURAS ESCOLARES
     @Query("SELECT * FROM subjects ORDER BY name ASC")
@@ -325,11 +394,17 @@ interface SchoolDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertPenalty(penalty: com.example.data.local.entity.PenaltyEntity): Long
 
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertPenalties(penalties: List<com.example.data.local.entity.PenaltyEntity>)
+
     @Update
     suspend fun updatePenalty(penalty: com.example.data.local.entity.PenaltyEntity)
 
     @Delete
     suspend fun deletePenalty(penalty: com.example.data.local.entity.PenaltyEntity)
+
+    @Query("DELETE FROM penalties")
+    suspend fun clearAllPenalties()
 
     // PARENT OBLIGATIONS / DEBERES Y PENSIONES DE PADRES DE FAMILIA
     @Query("SELECT * FROM parent_obligations ORDER BY dueDateMillis ASC")
@@ -364,4 +439,7 @@ interface SchoolDao {
 
     @Query("DELETE FROM parent_obligations WHERE id = :id")
     suspend fun deleteParentObligationById(id: Long)
+
+    @Query("DELETE FROM parent_obligations WHERE id NOT IN (:validIds)")
+    suspend fun pruneParentObligations(validIds: List<Long>)
 }

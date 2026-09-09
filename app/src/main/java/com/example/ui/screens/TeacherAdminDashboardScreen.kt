@@ -102,6 +102,7 @@ import com.example.data.local.entity.BadgeEntity
 import com.example.data.local.entity.ExamEntity
 import com.example.data.local.entity.ParentObligationEntity
 import com.example.data.local.entity.RedemptionEntity
+import com.example.data.local.entity.RewardEntity
 import com.example.data.local.entity.SubjectEntity
 import com.example.data.local.entity.TardyRecordEntity
 import com.example.data.local.entity.UserEntity
@@ -128,6 +129,7 @@ fun TeacherAdminDashboardScreen(
     val allSubjects by viewModel.allSubjects.collectAsState()
     val exams by viewModel.exams.collectAsState()
     val redemptions by viewModel.redemptions.collectAsState()
+    val rewards by viewModel.rewards.collectAsState()
     val allPenalties by viewModel.allPenalties.collectAsState()
     val parentObligations by viewModel.parentObligations.collectAsState()
     val currentUser by viewModel.currentUser.collectAsState()
@@ -143,6 +145,9 @@ fun TeacherAdminDashboardScreen(
     var showAddSubjectDialog by remember { mutableStateOf(false) }
     var showAddUserDialog by remember { mutableStateOf(false) }
     var showResetPointsConfirmationDialog by remember { mutableStateOf(false) }
+    var showCreateRewardDialog by remember { mutableStateOf(false) }
+    var rewardToEdit by remember { mutableStateOf<RewardEntity?>(null) }
+    var rewardToDelete by remember { mutableStateOf<RewardEntity?>(null) }
     var showGroupPointsDialog by remember { mutableStateOf(false) }
     var obligationToAwardPoints by remember { mutableStateOf<ParentObligationEntity?>(null) }
     var teacherSearchQuery by remember { mutableStateOf("") }
@@ -194,7 +199,19 @@ fun TeacherAdminDashboardScreen(
         }
     }
 
-    val tabTitles = listOf("⏰ Retardos", "🎖️ Logros", "📋 Deberes Padres", "🚨 Multas", "📝 Calificar", "🎟️ Canjes", "📚 Materias", "👥 Usuarios", "📞 Directorio", "📄 Resumen 7°")
+    val tabTitles = listOf(
+        "⏰ Retardos",        // 0
+        "🎖️ Logros",          // 1
+        "📋 Deberes Padres",  // 2
+        "🚨 Multas",          // 3
+        "📝 Calificar",       // 4
+        "🛍️ Tienda",          // 5
+        "🎟️ Canjes",          // 6
+        "📚 Materias",        // 7
+        "👥 Usuarios",        // 8
+        "📞 Directorio",      // 9
+        "📄 Resumen 7°"       // 10
+    )
 
     Box(modifier = modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize()) {
@@ -229,7 +246,6 @@ fun TeacherAdminDashboardScreen(
                     Spacer(modifier = Modifier.height(8.dp))
 
                     // SuperAdmin Title Bar
-                    // SuperAdmin Title Bar - Centrado con botón de acción debajo
                     Surface(
                         shape = RoundedCornerShape(16.dp),
                         color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f),
@@ -255,27 +271,25 @@ fun TeacherAdminDashboardScreen(
                                 ) {
                                     Icon(
                                         imageVector = Icons.Default.Security,
-                                        contentDescription = null,
-                                        tint = Color.White,
-                                        modifier = Modifier.size(18.dp)
+                                        contentDescription = "SuperAdmin Escolar",
+                                        tint = MaterialTheme.colorScheme.onPrimary,
+                                        modifier = Modifier.size(20.dp)
                                     )
                                 }
 
                                 Spacer(modifier = Modifier.width(10.dp))
 
-                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Column {
                                     Text(
-                                        text = "Gestión & Control Docente",
+                                        text = "Panel SuperAdmin Escolar",
                                         style = MaterialTheme.typography.titleMedium,
-                                        fontWeight = FontWeight.Black,
-                                        color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                        textAlign = TextAlign.Center
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer
                                     )
                                     Text(
-                                        text = "${com.example.domain.validation.ValidationUtils.formatProperNoun(currentUser?.name ?: "Ing. Manuel Muñoz")} 👨‍🏫",
+                                        text = "Control total y auditoría institucional 7° Grado",
                                         style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.primary,
-                                        textAlign = TextAlign.Center
+                                        color = MaterialTheme.colorScheme.primary
                                     )
                                 }
                             }
@@ -336,7 +350,21 @@ fun TeacherAdminDashboardScreen(
                                         Text("Multar", fontSize = 11.sp, maxLines = 1, softWrap = false)
                                     }
                                 }
-                                6 -> {
+                                5 -> {
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Button(
+                                        onClick = { showCreateRewardDialog = true },
+                                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                                        shape = RoundedCornerShape(10.dp),
+                                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                                        modifier = Modifier.height(32.dp).testTag("admin_add_reward_button")
+                                    ) {
+                                        Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(14.dp))
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text("Recompensa", fontSize = 11.sp, maxLines = 1, softWrap = false)
+                                    }
+                                }
+                                7 -> {
                                     Spacer(modifier = Modifier.height(8.dp))
                                     Button(
                                         onClick = { showAddSubjectDialog = true },
@@ -350,7 +378,7 @@ fun TeacherAdminDashboardScreen(
                                         Text("Materia", fontSize = 11.sp, maxLines = 1, softWrap = false)
                                     }
                                 }
-                                7 -> {
+                                8 -> {
                                     Spacer(modifier = Modifier.height(8.dp))
                                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                         Button(
@@ -377,7 +405,7 @@ fun TeacherAdminDashboardScreen(
                                         }
                                     }
                                 }
-                                8 -> {
+                                9 -> {
                                     Spacer(modifier = Modifier.height(8.dp))
                                     Button(
                                         onClick = {
@@ -396,7 +424,7 @@ fun TeacherAdminDashboardScreen(
                                         Text("Directorio PDF", fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false)
                                     }
                                 }
-                                9 -> {
+                                10 -> {
                                     Spacer(modifier = Modifier.height(8.dp))
                                     Button(
                                         onClick = {
@@ -605,6 +633,73 @@ fun TeacherAdminDashboardScreen(
                         }
                     }
                     5 -> {
+                        // REWARDS STORE / TIENDA TAB (CATÁLOGO ESCOLAR)
+                        item {
+                            Surface(
+                                shape = RoundedCornerShape(16.dp),
+                                color = MaterialTheme.colorScheme.surface,
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+                                shadowElevation = 1.dp,
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+                            ) {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(14.dp)
+                                ) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(
+                                                text = "🛍️ Catálogo y Tienda Escolar",
+                                                style = MaterialTheme.typography.titleMedium,
+                                                fontWeight = FontWeight.Bold,
+                                                color = MaterialTheme.colorScheme.onSurface
+                                            )
+                                            Text(
+                                                text = "Total de artículos: ${rewards.size} | Publica recompensas, existencias y precios en 🪙 Escolaris",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.outline
+                                            )
+                                        }
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Button(
+                                            onClick = { showCreateRewardDialog = true },
+                                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                                            shape = RoundedCornerShape(10.dp),
+                                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                                        ) {
+                                            Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text("Crear", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        if (rewards.isEmpty()) {
+                            item {
+                                AdminEmptyCard("No hay artículos en la tienda escolar. Haz clic en 'Crear' para publicar la primera recompensa.")
+                            }
+                        } else {
+                            items(rewards, key = { it.id }) { reward ->
+                                RewardItemCard(
+                                    reward = reward,
+                                    canAfford = true,
+                                    isTeacher = true,
+                                    isParent = false,
+                                    onRedeem = {},
+                                    onEdit = { rewardToEdit = reward },
+                                    onDelete = { rewardToDelete = reward }
+                                )
+                            }
+                        }
+                    }
+                    6 -> {
                         // PASSES / REDEMPTIONS TAB (CANJES)
                         if (redemptions.isEmpty()) {
                             item {
@@ -621,7 +716,7 @@ fun TeacherAdminDashboardScreen(
                             }
                         }
                     }
-                    6 -> {
+                    7 -> {
                         // SUBJECTS / ASIGNATURAS TAB
                         if (allSubjects.isEmpty()) {
                             item {
@@ -637,7 +732,7 @@ fun TeacherAdminDashboardScreen(
                             }
                         }
                     }
-                    7 -> {
+                    8 -> {
                         // USERS MANAGEMENT TAB (BORRAR / GESTIONAR USUARIOS)
                         item {
                             Column(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -788,7 +883,7 @@ fun TeacherAdminDashboardScreen(
                             }
                         }
                     }
-                    8 -> {
+                    9 -> {
                         // FACULTY DIRECTORY TAB (DIRECTORIO DOCENTE EN PANEL ADMIN)
                         item {
                             Surface(
@@ -870,7 +965,7 @@ fun TeacherAdminDashboardScreen(
                             }
                         }
                     }
-                    9 -> {
+                    10 -> {
                         // COURSE SUMMARY TAB (DESCARGA RESUMEN)
                         item {
                             AdminCourseSummarySection(
@@ -1270,6 +1365,67 @@ fun TeacherAdminDashboardScreen(
             onDismiss = { examToGrade = null },
             onSaveGrade = { grade, feedback ->
                 viewModel.gradeStudentExam(exam.id, grade, feedback)
+            }
+        )
+    }
+
+    if (showCreateRewardDialog) {
+        CreateRewardDialog(
+            onDismiss = { showCreateRewardDialog = false },
+            onCreate = { title, desc, cost, cat, stock ->
+                viewModel.createNewTeacherReward(title, desc, cost, cat, "🎁", stock)
+            }
+        )
+    }
+
+    rewardToEdit?.let { targetReward ->
+        EditRewardDialog(
+            reward = targetReward,
+            onDismiss = { rewardToEdit = null },
+            onSave = { title, desc, cost, category, stock ->
+                viewModel.updateTeacherReward(
+                    rewardId = targetReward.id,
+                    title = title,
+                    desc = desc,
+                    cost = cost,
+                    category = category,
+                    stock = stock,
+                    icon = targetReward.iconKey
+                )
+                rewardToEdit = null
+            }
+        )
+    }
+
+    rewardToDelete?.let { targetReward ->
+        AlertDialog(
+            onDismissRequest = { rewardToDelete = null },
+            shape = RoundedCornerShape(16.dp),
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Icon(Icons.Default.Warning, contentDescription = null, tint = DangerRed)
+                    Text("¿Eliminar Recompensa?", fontWeight = FontWeight.Bold)
+                }
+            },
+            text = {
+                Text("¿Estás seguro de que deseas eliminar permanentemente '${targetReward.title}' de la tienda escolar? Los estudiantes ya no podrán canjearla.")
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.deleteReward(targetReward)
+                        rewardToDelete = null
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = DangerRed),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Text("Eliminar")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { rewardToDelete = null }) {
+                    Text("Cancelar")
+                }
             }
         )
     }
@@ -3182,6 +3338,8 @@ fun AdminUserRowCard(
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
                             color = SuccessGreen,
+                            maxLines = 1,
+                            softWrap = false,
                             modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                         )
                     }
@@ -3194,6 +3352,8 @@ fun AdminUserRowCard(
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
                             color = Color(0xFFD97706),
+                            maxLines = 1,
+                            softWrap = false,
                             modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                         )
                     }

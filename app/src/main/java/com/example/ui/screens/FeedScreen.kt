@@ -78,6 +78,31 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+fun matchesCategory(postType: String?, selectedFilter: String): Boolean {
+    if (selectedFilter.equals("Todos", ignoreCase = true) || selectedFilter.equals("ALL", ignoreCase = true) || selectedFilter.equals("TODOS", ignoreCase = true)) {
+        return true
+    }
+
+    val cleanType = (postType ?: "").trim().uppercase()
+    val cleanFilter = selectedFilter.trim().uppercase()
+
+    return when {
+        // Caso Avisos / Comunicados / Eventos
+        cleanFilter.contains("AVISO") || cleanFilter.contains("ANNOUNCEMENT") -> {
+            cleanType.contains("AVISO") || cleanType.contains("ANNOUNCEMENT") || cleanType == "GENERAL" || cleanType == "EVENT" || cleanType.contains("COMUNICADO")
+        }
+        // Caso Auxilio de Apuntes
+        cleanFilter.contains("APUNTE") || cleanFilter.contains("HELP") || cleanFilter.contains("NOTES") -> {
+            cleanType.contains("APUNTE") || cleanType.contains("HELP") || cleanType.contains("NOTES")
+        }
+        // Caso Tareas & Exámenes
+        cleanFilter.contains("TAREA") || cleanFilter.contains("EXAM") || cleanFilter.contains("ACADEMIC") || cleanFilter.contains("HOMEWORK") -> {
+            cleanType.contains("TAREA") || cleanType.contains("EXAM") || cleanType.contains("ACADEMIC") || cleanType.contains("TASK") || cleanType.contains("HOMEWORK") || cleanType.contains("STUDY")
+        }
+        else -> cleanType == cleanFilter
+    }
+}
+
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun FeedScreen(
@@ -107,21 +132,14 @@ fun FeedScreen(
     val filteredPosts = remember(posts, selectedFilter, isParent) {
         val basePosts = if (isParent) {
             posts.filter {
-                it.postType == PostType.ANNOUNCEMENT.code ||
-                it.postType == PostType.EVENT.code ||
-                it.postType == PostType.HOMEWORK_ALERT.code ||
-                it.postType == PostType.EXAM_ALERT.code
+                matchesCategory(it.postType, "ANNOUNCEMENT") ||
+                matchesCategory(it.postType, "HOMEWORK")
             }
         } else {
             posts
         }
 
-        when (selectedFilter) {
-            "LATE_HELP" -> basePosts.filter { it.postType == PostType.LATE_HELP_REQUEST.code }
-            "ANNOUNCEMENT" -> basePosts.filter { it.postType == PostType.ANNOUNCEMENT.code || it.postType == PostType.EVENT.code }
-            "HOMEWORK" -> basePosts.filter { it.postType == PostType.HOMEWORK_ALERT.code || it.postType == PostType.EXAM_ALERT.code }
-            else -> basePosts
-        }
+        basePosts.filter { matchesCategory(it.postType, selectedFilter) }
     }
 
     Box(modifier = modifier.fillMaxSize()) {
@@ -397,7 +415,7 @@ fun FeedPostCard(
     val comments by commentsFlow.collectAsState(initial = emptyList())
 
     val dateFormat = SimpleDateFormat("dd MMM, HH:mm", Locale.getDefault())
-    val isLateHelp = post.postType == PostType.LATE_HELP_REQUEST.code
+    val isLateHelp = matchesCategory(post.postType, "LATE_HELP")
     val isTeacher = UserRole.isTeacherOrAdmin(currentUser?.role) || currentUser?.email == "moz658@gmail.com"
     var showAuthorPhotoDialog by remember { mutableStateOf(false) }
 
@@ -555,14 +573,15 @@ fun FeedPostCard(
             Spacer(modifier = Modifier.height(12.dp))
 
             // Post Title & Content
-            Text(
-                text = post.title,
-                fontWeight = FontWeight.Bold,
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-
-            Spacer(modifier = Modifier.height(6.dp))
+            if (post.title.isNotBlank()) {
+                Text(
+                    text = post.title,
+                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+            }
 
             Text(
                 text = post.content,
@@ -682,7 +701,13 @@ fun FeedPostCard(
                 if (isCommentsExpanded && comments.isNotEmpty()) {
                     Divider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f))
                      comments.forEach { comment ->
-                        CommentRowItem(comment = comment, allUsers = allUsers)
+                        val canDeleteComment = isTeacher || comment.authorId == currentUser?.id
+                        CommentRowItem(
+                            comment = comment,
+                            allUsers = allUsers,
+                            canDelete = canDeleteComment,
+                            onDelete = { viewModel.deleteComment(comment.id, comment.postId) }
+                        )
                         Spacer(modifier = Modifier.height(8.dp))
                     }
                 }
@@ -838,7 +863,9 @@ fun FeedPostCard(
 @Composable
 fun CommentRowItem(
     comment: PostCommentEntity,
-    allUsers: List<UserEntity> = emptyList()
+    allUsers: List<UserEntity> = emptyList(),
+    canDelete: Boolean = false,
+    onDelete: () -> Unit = {}
 ) {
     val dateFormat = SimpleDateFormat("dd MMM, HH:mm", Locale.getDefault())
     val commenter = allUsers.find { it.id == comment.authorId }
@@ -907,7 +934,8 @@ fun CommentRowItem(
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        modifier = Modifier.weight(1f, fill = false)
                     ) {
                         Text(
                             text = com.example.domain.validation.ValidationUtils.formatProperNoun(commenterName),
@@ -940,12 +968,30 @@ fun CommentRowItem(
                         }
                     }
 
-                    Text(
-                        text = dateFormat.format(Date(comment.timestamp)),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.outline,
-                        fontSize = 10.sp
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Text(
+                            text = dateFormat.format(Date(comment.timestamp)),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.outline,
+                            fontSize = 10.sp
+                        )
+                        if (canDelete) {
+                            IconButton(
+                                onClick = onDelete,
+                                modifier = Modifier.size(20.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Delete,
+                                    contentDescription = "Eliminar comentario",
+                                    tint = MaterialTheme.colorScheme.error.copy(alpha = 0.7f),
+                                    modifier = Modifier.size(13.dp)
+                                )
+                            }
+                        }
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(3.dp))

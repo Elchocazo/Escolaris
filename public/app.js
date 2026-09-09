@@ -3,7 +3,7 @@
 // =========================================================================
 
 // 1. Firebase Configuration & Init
-let app, auth, db;
+let app, auth, db, messaging;
 try {
   if (firebase.apps.length > 0) {
     app = firebase.app();
@@ -23,6 +23,14 @@ try {
   } catch (e) {}
   db = firebase.firestore();
   db.enablePersistence().catch(() => {});
+
+  if (firebase.messaging && firebase.messaging.isSupported()) {
+    try {
+      messaging = firebase.messaging();
+    } catch (e) {
+      console.warn("FCM init warning:", e);
+    }
+  }
 } catch (e) {
   console.warn("Firebase Init fallback:", e);
 }
@@ -37,6 +45,7 @@ let activeScheduleDay = 'Lunes';
 let allUsers = [];
 let userTasks = [];
 let feedPosts = [];
+let currentFeedFilter = 'todos';
 let allTardies = [];
 let allBadges = [];
 let allPenalties = [];
@@ -69,31 +78,207 @@ function getSchoolRank(xp) {
   return SCHOOL_RANKS[0];
 }
 
+// -----------------------------------------------------------------------------
+// LISTA MAESTRA OFICIAL DE INSIGNIAS BASE (PROGRESO INICIAL EN CERO)
+// -----------------------------------------------------------------------------
+function getInitialBadgesForRole(role) {
+  const normRole = (role || '').trim().toUpperCase();
+  const isParent = normRole === 'PARENT' || normRole === 'TUTOR' || normRole === 'ACUDIENTE';
+
+  if (isParent) {
+    return [
+      {
+        id: 'badge_parent_report_cards',
+        title: 'Entrega de Boletines',
+        description: 'Asistir puntualmente a las 4 entregas oficiales de informes académicos.',
+        category: 'PARENT',
+        currentProgress: 0,
+        targetProgress: 4,
+        emoji: '📋',
+        isUnlocked: false,
+        unlockedAtDate: null,
+        xpReward: 250,
+        creditReward: 120
+      },
+      {
+        id: 'badge_parent_workshops',
+        title: 'Escuela de Padres',
+        description: 'Participar activamente en 2 talleres de formación y escuela de padres.',
+        category: 'PARENT',
+        currentProgress: 0,
+        targetProgress: 2,
+        emoji: '👨‍👩‍👧',
+        isUnlocked: false,
+        unlockedAtDate: null,
+        xpReward: 300,
+        creditReward: 150
+      },
+      {
+        id: 'badge_parent_pension',
+        title: 'Compromiso de Pensión',
+        description: 'Pagar puntualmente la pensión durante 3 meses consecutivos dentro de los primeros 5 días del mes.',
+        category: 'PARENT',
+        currentProgress: 0,
+        targetProgress: 3,
+        emoji: '💳',
+        isUnlocked: false,
+        unlockedAtDate: null,
+        xpReward: 350,
+        creditReward: 200
+      },
+      {
+        id: 'badge_parent_meetings',
+        title: 'Reunión de Padres',
+        description: 'Asistir y participar en las asambleas generales y reuniones informativas de curso con docentes.',
+        category: 'PARENT',
+        currentProgress: 0,
+        targetProgress: 2,
+        emoji: '🤝',
+        isUnlocked: false,
+        unlockedAtDate: null,
+        xpReward: 200,
+        creditReward: 100
+      },
+      {
+        id: 'badge_parent_support',
+        title: 'Acompañamiento',
+        description: 'Supervisión diaria y apoyo formativo en las tareas y deberes escolares en casa.',
+        category: 'PARENT',
+        currentProgress: 0,
+        targetProgress: 5,
+        emoji: '🏡',
+        isUnlocked: false,
+        unlockedAtDate: null,
+        xpReward: 180,
+        creditReward: 90
+      }
+    ];
+  } else {
+    return [
+      {
+        id: 'badge_student_tasks_10',
+        title: 'Cumplimiento de Tareas',
+        description: 'Entregar 10 tareas a tiempo y completas antes del cierre de periodo escolar.',
+        category: 'ACADEMIC',
+        currentProgress: 0,
+        targetProgress: 10,
+        emoji: '📚',
+        isUnlocked: false,
+        unlockedAtDate: null,
+        xpReward: 200,
+        creditReward: 100
+      },
+      {
+        id: 'badge_student_attendance_20',
+        title: 'Asistencia Ejemplar',
+        description: 'Acumular 20 días de asistencia continua sin retardos ni ausencias.',
+        category: 'STUDENT',
+        currentProgress: 0,
+        targetProgress: 20,
+        emoji: '⏰',
+        isUnlocked: false,
+        unlockedAtDate: null,
+        xpReward: 220,
+        creditReward: 110
+      },
+      {
+        id: 'badge_student_academic_excellence_5',
+        title: 'Excelencia Académica',
+        description: 'Aprobar 5 evaluaciones o exámenes bimestrales con calificación sobresaliente (4.5 o más).',
+        category: 'ACADEMIC',
+        currentProgress: 0,
+        targetProgress: 5,
+        emoji: '⭐',
+        isUnlocked: false,
+        unlockedAtDate: null,
+        xpReward: 300,
+        creditReward: 150
+      },
+      {
+        id: 'badge_student_steam',
+        title: 'Innovador STEAM',
+        description: 'Presentar un proyecto destacado en la Feria de Ciencia, Tecnología y Robótica.',
+        category: 'ACADEMIC',
+        currentProgress: 0,
+        targetProgress: 1,
+        emoji: '🔬',
+        isUnlocked: false,
+        unlockedAtDate: null,
+        xpReward: 400,
+        creditReward: 250
+      },
+      {
+        id: 'badge_student_reading',
+        title: 'Lector Voraz',
+        description: 'Completar la lectura y análisis de 6 obras literarias en el Plan Lector escolar.',
+        category: 'ACADEMIC',
+        currentProgress: 0,
+        targetProgress: 6,
+        emoji: '📖',
+        isUnlocked: false,
+        unlockedAtDate: null,
+        xpReward: 180,
+        creditReward: 90
+      },
+      {
+        id: 'badge_student_civic',
+        title: 'Líder de Paz',
+        description: 'Participar en 3 jornadas de mediación escolar y sana convivencia.',
+        category: 'STUDENT',
+        currentProgress: 0,
+        targetProgress: 3,
+        emoji: '🕊️',
+        isUnlocked: false,
+        unlockedAtDate: null,
+        xpReward: 200,
+        creditReward: 100
+      },
+      {
+        id: 'badge_student_solidarity',
+        title: 'Compañero Solidario',
+        description: 'Reconocimiento por trabajo en equipo, empatía y apoyo a compañeros de clase.',
+        category: 'STUDENT',
+        currentProgress: 0,
+        targetProgress: 2,
+        emoji: '🤝',
+        isUnlocked: false,
+        unlockedAtDate: null,
+        xpReward: 250,
+        creditReward: 120
+      }
+    ];
+  }
+}
+
 const familyBadgePresets = [
-  { key: 'PARENT_PENSION_OCTUBRE', title: 'Pago Oportuno de Pensión (Octubre)', desc: 'Cancelación oportuna de la pensión escolar en los 5 primeros días del mes.', emoji: '💳' },
-  { key: 'PARENT_PENSION_SEMESTER', title: 'Pensión al Día - Semestre', desc: 'Cumplimiento mensual impecable de pensiones escolares.', emoji: '💎' },
-  { key: 'PARENT_EXEMPLARY_TUTOR', title: 'Tutor Ejemplar & Puntual', desc: 'Acompañamiento integral, puntualidad y constante apoyo formativo.', emoji: '👑' },
-  { key: 'PARENT_MEETING_1', title: 'Asistencia 1ª Reunión', desc: 'Asistencia puntual y compromiso en la primera entrega de informes.', emoji: '👨‍👩‍👧' },
-  { key: 'PARENT_COLLABORATOR', title: 'Padre Colaborador', desc: 'Participación activa y colaboración en actividades escolares.', emoji: '🤝' },
-  { key: 'FAMILY_EXCELLENCE', title: 'Familia Ejemplar', desc: 'Acompañamiento formativo, disciplina y apoyo educativo en casa.', emoji: '🏆' },
-  { key: 'PUNCTUAL_FAMILY', title: 'Familia Puntual', desc: 'Puntualidad intachable y cero retardos escolares.', emoji: '⏰' },
-  { key: 'READING_AT_HOME', title: 'Lectura en Familia', desc: 'Fomento de la lectura compartida y hábito lector en el hogar.', emoji: '📖' },
-  { key: 'HOMEWORK_SUPPORT', title: 'Apoyo en Tareas', desc: 'Acompañamiento positivo en el cumplimiento de deberes escolares.', emoji: '✍️' },
-  { key: 'FAMILY_STEAM_PROJECT', title: 'Proyecto Escolar en Familia', desc: 'Acompañamiento en maquetas, inventos y actividades escolares.', emoji: '🧪' },
-  { key: 'FAMILY_VALUES', title: 'Cuna de Valores', desc: 'Educación basada en la honestidad, respeto y convivencia.', emoji: '💖' }
+  { key: 'PARENT_REPORT_CARDS', id: 'badge_parent_report_cards', title: 'Entrega de Boletines', desc: 'Asistir puntualmente a las 4 entregas oficiales de informes académicos.', emoji: '📋', targetProgress: 4, currentProgress: 0 },
+  { key: 'PARENT_WORKSHOPS', id: 'badge_parent_workshops', title: 'Escuela de Padres', desc: 'Participar activamente en 2 talleres de formación y escuela de padres.', emoji: '👨‍👩‍👧', targetProgress: 2, currentProgress: 0 },
+  { key: 'PARENT_PENSION', id: 'badge_parent_pension', title: 'Compromiso de Pensión', desc: 'Pagar puntualmente la pensión durante 3 meses consecutivos dentro de los primeros 5 días del mes.', emoji: '💳', targetProgress: 3, currentProgress: 0 },
+  { key: 'PARENT_MEETINGS', id: 'badge_parent_meetings', title: 'Reunión de Padres', desc: 'Asistir y participar en las asambleas generales y reuniones informativas de curso con docentes.', emoji: '🤝', targetProgress: 2, currentProgress: 0 },
+  { key: 'PARENT_SUPPORT', id: 'badge_parent_support', title: 'Acompañamiento', desc: 'Supervisión diaria y apoyo formativo en las tareas y deberes escolares en casa.', emoji: '🏡', targetProgress: 5, currentProgress: 0 },
+  { key: 'PARENT_PENSION_OCTUBRE', title: 'Pago Oportuno de Pensión (Octubre)', desc: 'Cancelación oportuna de la pensión escolar en los 5 primeros días del mes.', emoji: '💳', targetProgress: 1, currentProgress: 0 },
+  { key: 'PARENT_PENSION_SEMESTER', title: 'Pensión al Día - Semestre', desc: 'Cumplimiento mensual impecable de pensiones escolares.', emoji: '💎', targetProgress: 5, currentProgress: 0 },
+  { key: 'PARENT_EXEMPLARY_TUTOR', title: 'Tutor Ejemplar & Puntual', desc: 'Acompañamiento integral, puntualidad y constante apoyo formativo.', emoji: '👑', targetProgress: 1, currentProgress: 0 },
+  { key: 'FAMILY_EXCELLENCE', title: 'Familia Ejemplar', desc: 'Acompañamiento formativo, disciplina y apoyo educativo en casa.', emoji: '🏆', targetProgress: 1, currentProgress: 0 },
+  { key: 'PUNCTUAL_FAMILY', title: 'Familia Puntual', desc: 'Puntualidad intachable y cero retardos escolares.', emoji: '⏰', targetProgress: 1, currentProgress: 0 },
+  { key: 'READING_AT_HOME', title: 'Lectura en Familia', desc: 'Fomento de la lectura compartida y hábito lector en el hogar.', emoji: '📖', targetProgress: 1, currentProgress: 0 },
+  { key: 'HOMEWORK_SUPPORT', title: 'Apoyo en Tareas', desc: 'Acompañamiento positivo en el cumplimiento de deberes escolares.', emoji: '✍️', targetProgress: 1, currentProgress: 0 }
 ];
 
 const studentBadgePresets = [
-  { key: 'FLAG_RAISING', title: 'Izada de Bandera', desc: 'Honor patrio, rendimiento académico y convivencia escolar ejemplar.', emoji: '🇨🇴' },
-  { key: 'FIRST_GRADE_5', title: 'Nota Sobresaliente (5.0)', desc: 'Calificación excelente en una evaluación o taller formativo.', emoji: '⭐' },
-  { key: 'PERFECT_ATTENDANCE', title: 'Puntualidad de Oro', desc: 'Asistencia impecable y llegada a tiempo a todas las clases.', emoji: '⏰' },
-  { key: 'PEER_HELPER', title: 'Compañero Solidario', desc: 'Apoyo desinteresado a compañeros y trabajo en equipo.', emoji: '🤝' },
-  { key: 'BOOK_DEVOURER', title: 'Lector Entusiasta', desc: 'Compromiso constante con la lectura y comprensión crítica de textos.', emoji: '📖' },
-  { key: 'SCIENCE_EXPLORER', title: 'Científico Escolar', desc: 'Curiosidad e investigación destacada en experimentos de ciencias y química.', emoji: '🔬' },
-  { key: 'ARTISTIC_EXPRESSION', title: 'Expresión Artística', desc: 'Creatividad, originalidad y esmero en proyectos de arte y música.', emoji: '🎨' },
-  { key: 'CLASSROOM_CARE', title: 'Cuidado del Salón', desc: 'Preservación del aula limpia, orden y respeto a los recursos escolares.', emoji: '🌱' },
-  { key: 'CURIOUS_MIND', title: 'Participación Activa', desc: 'Aportes reflexivos, preguntas constructivas y atención en clase.', emoji: '💡' },
-  { key: 'STREAK_7_DAYS', title: 'Semana Impecable', desc: 'Una semana completa con tareas entregadas y disciplina escolar constante.', emoji: '🔥' }
+  { key: 'STUDENT_TASKS_10', id: 'badge_student_tasks_10', title: 'Cumplimiento de Tareas', desc: 'Entregar 10 tareas a tiempo y completas antes del cierre de periodo escolar.', emoji: '📚', targetProgress: 10, currentProgress: 0 },
+  { key: 'STUDENT_ATTENDANCE_20', id: 'badge_student_attendance_20', title: 'Asistencia Ejemplar', desc: 'Acumular 20 días de asistencia continua sin retardos ni ausencias.', emoji: '⏰', targetProgress: 20, currentProgress: 0 },
+  { key: 'STUDENT_ACADEMIC_EXCELLENCE_5', id: 'badge_student_academic_excellence_5', title: 'Excelencia Académica', desc: 'Aprobar 5 evaluaciones o exámenes bimestrales con calificación sobresaliente (4.5 o más).', emoji: '⭐', targetProgress: 5, currentProgress: 0 },
+  { key: 'STUDENT_STEAM', id: 'badge_student_steam', title: 'Innovador STEAM', desc: 'Presentar un proyecto destacado en la Feria de Ciencia, Tecnología y Robótica.', emoji: '🔬', targetProgress: 1, currentProgress: 0 },
+  { key: 'STUDENT_READING', id: 'badge_student_reading', title: 'Lector Voraz', desc: 'Completar la lectura y análisis de 6 obras literarias en el Plan Lector escolar.', emoji: '📖', targetProgress: 6, currentProgress: 0 },
+  { key: 'STUDENT_CIVIC', id: 'badge_student_civic', title: 'Líder de Paz', desc: 'Participar en 3 jornadas de mediación escolar y sana convivencia.', emoji: '🕊️', targetProgress: 3, currentProgress: 0 },
+  { key: 'PEER_HELPER', id: 'badge_student_solidarity', title: 'Compañero Solidario', desc: 'Reconocimiento por trabajo en equipo, empatía y apoyo a compañeros de clase.', emoji: '🤝', targetProgress: 2, currentProgress: 0 },
+  { key: 'FLAG_RAISING', title: 'Izada de Bandera', desc: 'Honor patrio, rendimiento académico y convivencia escolar ejemplar.', emoji: '🇨🇴', targetProgress: 1, currentProgress: 0 },
+  { key: 'FIRST_GRADE_5', title: 'Nota Sobresaliente (5.0)', desc: 'Calificación excelente en una evaluación o taller formativo.', emoji: '⭐', targetProgress: 1, currentProgress: 0 },
+  { key: 'PERFECT_ATTENDANCE', title: 'Puntualidad de Oro', desc: 'Asistencia impecable y llegada a tiempo a todas las clases.', emoji: '⏰', targetProgress: 1, currentProgress: 0 },
+  { key: 'BOOK_DEVOURER', title: 'Lector Entusiasta', desc: 'Compromiso constante con la lectura y comprensión crítica de textos.', emoji: '📖', targetProgress: 1, currentProgress: 0 },
+  { key: 'SCIENCE_EXPLORER', title: 'Científico Escolar', desc: 'Curiosidad e investigación destacada en experimentos de ciencias y química.', emoji: '🔬', targetProgress: 1, currentProgress: 0 },
+  { key: 'STREAK_7_DAYS', title: 'Semana Impecable', desc: 'Una semana completa con tareas entregadas y disciplina escolar constante.', emoji: '🔥', targetProgress: 1, currentProgress: 0 }
 ];
 
 let activeRewardsCategory = 'ALL';
@@ -160,6 +345,10 @@ function tryRestoreCachedSession() {
         renderNavigationForRole(currentUser.role);
         renderUserProfile();
         renderRoleSpecificScreens();
+
+        const savedTab = sessionStorage.getItem('escolaris_active_tab') || 
+          (currentUser.role === 'TEACHER' ? 'teacher-admin' : (currentUser.role === 'PARENT' ? 'parent-dashboard' : 'feed'));
+        switchNav(savedTab);
         return true;
       }
     }
@@ -175,12 +364,12 @@ tryRestoreCachedSession();
 // 4. Auth State Listener
 auth.onAuthStateChanged(async (user) => {
   const splash = document.getElementById('app-boot-splash');
-  if (splash) splash.style.display = 'none';
-
   const authView = document.getElementById('auth-view');
   const mainApp = document.getElementById('main-app');
 
   if (user) {
+    document.documentElement.classList.remove('auth-restoring');
+    if (splash) splash.style.display = 'none';
     if (authView) {
       authView.classList.add('hidden');
       authView.style.display = 'none';
@@ -192,10 +381,38 @@ auth.onAuthStateChanged(async (user) => {
     setupUserListener(user.uid, user.email, user.displayName, user.photoURL);
     setupDataListeners();
     checkIosPrompt();
+    requestNotificationPermission(user.uid);
   } else {
+    // Si existe sesión previa en caché, esperar un momento antes de conmutar al login
+    // para evitar el destello mientras Firebase Auth lee el token de IndexedDB.
+    const hasCachedSession = !!localStorage.getItem('escolaris_cached_user') || !!localStorage.getItem('escolaris_session_uid');
+    if (hasCachedSession && !user) {
+      setTimeout(() => {
+        if (!auth.currentUser) {
+          document.documentElement.classList.remove('auth-restoring');
+          currentUser = null;
+          localStorage.removeItem('escolaris_cached_user');
+          localStorage.removeItem('escolaris_session_uid');
+          if (splash) splash.style.display = 'none';
+          if (authView) {
+            authView.classList.remove('hidden');
+            authView.style.display = '';
+          }
+          if (mainApp) {
+            mainApp.classList.add('hidden');
+            mainApp.style.display = 'none';
+          }
+        }
+      }, 600);
+      return;
+    }
+
+    document.documentElement.classList.remove('auth-restoring');
     currentUser = null;
+    dataListenersAttached = false;
     localStorage.removeItem('escolaris_cached_user');
     localStorage.removeItem('escolaris_session_uid');
+    if (splash) splash.style.display = 'none';
     if (authView) {
       authView.classList.remove('hidden');
       authView.style.display = '';
@@ -206,6 +423,94 @@ auth.onAuthStateChanged(async (user) => {
     }
   }
 });
+
+// Setup FCM Web Push Notifications & Token Sync
+async function requestNotificationPermission(userId) {
+  if (!('Notification' in window) || !('serviceWorker' in navigator)) {
+    console.warn('[FCM] Las notificaciones no son compatibles con este navegador.');
+    return null;
+  }
+  if (!messaging) {
+    console.warn('[FCM] Firebase Messaging no está inicializado.');
+    return null;
+  }
+  const targetUid = userId || (currentUser ? currentUser.id : auth.currentUser?.uid);
+  if (!targetUid) {
+    console.warn('[FCM] No hay usuario activo para vincular el token.');
+    return null;
+  }
+
+  try {
+    const permission = await Notification.requestPermission();
+    if (permission !== 'granted') {
+      console.log('[FCM] Permiso de notificaciones:', permission);
+      return null;
+    }
+
+    // Registrar o recuperar el Service Worker específico de FCM
+    const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+    console.log('[FCM] ServiceWorker registrado con alcance:', registration.scope);
+
+    // Obtener token FCM para la Web
+    const tokenOptions = {
+      serviceWorkerRegistration: registration
+    };
+    if (window.__VAPID_KEY__) {
+      tokenOptions.vapidKey = window.__VAPID_KEY__;
+    }
+
+    const currentToken = await messaging.getToken(tokenOptions);
+
+    if (currentToken) {
+      console.log('[FCM] Web Token obtenido con éxito:', currentToken);
+
+      // 1. Guardar en subcolección users/{userId}/fcmTokens/{tokenId} (homologado con Android)
+      await db.collection('users')
+        .doc(targetUid)
+        .collection('fcmTokens')
+        .doc(currentToken)
+        .set({
+          token: currentToken,
+          platform: 'web',
+          userAgent: navigator.userAgent,
+          createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+          updatedAt: Date.now()
+        }, { merge: true });
+
+      // 2. Guardar también en el documento del usuario para consultas directas y arrays
+      await db.collection('users').doc(targetUid).update({
+        fcmWebToken: currentToken,
+        fcmWebUpdatedAt: Date.now(),
+        fcmTokens: firebase.firestore.FieldValue.arrayUnion(currentToken)
+      }).catch(() => {});
+
+      showToast("🔔 Notificaciones push activadas correctamente");
+      return currentToken;
+    } else {
+      console.warn('[FCM] No se pudo obtener el token. Verifica los permisos o VAPID key en Firebase Console.');
+    }
+  } catch (err) {
+    console.warn('[FCM] Error solicitando permisos o generando token:', err);
+  }
+  return null;
+}
+
+// Alias para compatibilidad hacia atrás
+const initWebPushMessaging = requestNotificationPermission;
+
+// Escuchar notificaciones cuando la app está abierta en primer plano
+if (messaging) {
+  try {
+    messaging.onMessage((payload) => {
+      console.log('[FCM] Mensaje recibido en primer plano:', payload);
+      const title = payload.notification?.title || payload.data?.title || 'Escolaris';
+      const body = payload.notification?.body || payload.data?.body || payload.data?.message || 'Nueva notificación escolar';
+      showToast(`🔔 ${title}: ${body}`);
+    });
+  } catch (e) {
+    console.warn('[FCM] Error registrando onMessage:', e);
+  }
+}
 
 // Setup Live User Profile Listener (Unified Mobile & Web Sync with Data Preservation)
 function setupUserListener(uid, email, displayName, photoURL) {
@@ -254,6 +559,11 @@ function setupUserListener(uid, email, displayName, photoURL) {
         if (currentUser.role === 'STUDENT' && !currentUser.studentCode) {
           updates.studentCode = 'ESC-' + Math.random().toString(36).substring(2, 8).toUpperCase();
           currentUser.studentCode = updates.studentCode;
+        }
+        if (!currentUser.badges || !Array.isArray(currentUser.badges) || currentUser.badges.length === 0) {
+          const initBadges = getInitialBadgesForRole(currentUser.role);
+          updates.badges = initBadges;
+          currentUser.badges = initBadges;
         }
       }
 
@@ -328,6 +638,7 @@ function setupUserListener(uid, email, displayName, photoURL) {
           avatarColorHex: defaultRole === 'TEACHER' ? 0xFF1D4ED8 : 0xFF2563EB,
           photoUri: photoURL || null,
           roleConfigured: true,
+          badges: getInitialBadgesForRole(defaultRole),
           createdAt: firebase.firestore.FieldValue.serverTimestamp()
         };
         await userRef.set(defaultUser);
@@ -362,19 +673,45 @@ function setupUserListener(uid, email, displayName, photoURL) {
   });
 }
 
+let dataListenersAttached = false;
+
 // Setup Live Firestore Listeners
 function setupDataListeners() {
+  if (dataListenersAttached) {
+    console.log("[Firestore] Data listeners ya fueron inicializados.");
+    return;
+  }
+  dataListenersAttached = true;
+  console.log("[Firestore] Inicializando data listeners en tiempo real...");
+
   db.collection('users').onSnapshot((snapshot) => {
     allUsers = [];
     snapshot.forEach(doc => {
       allUsers.push({ id: doc.id, ...doc.data() });
     });
-    leaderboardUsers = [...allUsers].sort((a, b) => (b.xp || 0) - (a.xp || 0));
+    leaderboardUsers = [...allUsers].sort((a, b) => ((b.xp || 0) - (a.xp || 0)) || ((b.credits || 0) - (a.credits || 0)));
+    console.log(`[Firestore] Usuarios cargados: ${allUsers.length}`);
+
+    if (currentUser) {
+      const updatedMe = allUsers.find(u => u.id === currentUser.id);
+      if (updatedMe) {
+        currentUser = { ...currentUser, ...updatedMe };
+        try {
+          localStorage.setItem('escolaris_cached_user', JSON.stringify(currentUser));
+        } catch (e) {}
+        renderUserProfile();
+      }
+    }
+
     renderLeaderboard();
-    renderAdminStudents();
+    renderAdminUsers();
+    renderRoleSpecificScreens();
     populateStudentSelects();
     seedInstitutionalUsers();
-  }, (err) => console.log("Users listener error:", err));
+    renderFeed(); // Actualiza preview de ranking en el lateral del muro
+  }, (err) => {
+    console.error("Error detallado en Users listener:", err);
+  });
 
   db.collection('tasks').onSnapshot((snapshot) => {
     userTasks = [];
@@ -384,7 +721,7 @@ function setupDataListeners() {
     renderTasks();
     renderRoleSpecificScreens();
     if (currentTab === 'calendar') renderCalendar();
-  }, (err) => console.log("Tasks listener error:", err));
+  }, (err) => console.error("Error detallado en Tasks:", err));
 
   db.collection('tardies').onSnapshot((snapshot) => {
     allTardies = [];
@@ -393,7 +730,7 @@ function setupDataListeners() {
     });
     renderAdminTardies();
     renderParentTardies();
-  }, (err) => console.log("Tardies listener error:", err));
+  }, (err) => console.error("Error detallado en Tardies:", err));
 
   db.collection('badges').onSnapshot((snapshot) => {
     allBadges = [];
@@ -403,15 +740,30 @@ function setupDataListeners() {
     renderProfileBadges();
     renderParentFamilyBadges();
     renderAdminBadges();
-  }, (err) => console.log("Badges listener error:", err));
+  }, (err) => console.error("Error detallado en Badges:", err));
 
-  db.collection('feed_posts').orderBy('timestampMillis', 'desc').limit(30).onSnapshot((snapshot) => {
+  // Escucha del Muro Escolar: sin forzar orderBy en Firestore para que funcione
+  // inmediatamente incluso si faltan campos/índices en algún documento.
+  db.collection('feed_posts').onSnapshot((snapshot) => {
     feedPosts = [];
     snapshot.forEach(doc => {
       feedPosts.push({ id: doc.id, ...doc.data() });
     });
+    // Ordenar de forma descendente en memoria por fecha
+    feedPosts.sort((a, b) => {
+      const tsA = a.timestampMillis || a.timestamp || 0;
+      const tsB = b.timestampMillis || b.timestamp || 0;
+      return tsB - tsA;
+    });
+    console.log(`[Firestore] Publicaciones recibidas del muro: ${feedPosts.length}`);
     renderFeed();
-  }, (err) => console.log("Feed listener error:", err));
+  }, (err) => {
+    console.error("Error detallado en Feed:", err);
+    const container = document.getElementById('feed-posts-list');
+    if (container) {
+      container.innerHTML = `<p style="font-size:12px; color:var(--danger); text-align:center; padding:20px;">Error al cargar publicaciones: ${err.message}</p>`;
+    }
+  });
 
   db.collection('redemptions').onSnapshot((snapshot) => {
     userRedemptions = [];
@@ -480,23 +832,6 @@ async function seedInitialRewards() {
 async function seedInitialParentObligations() {
   try {
     const initObligations = [
-      {
-        title: "Pago Oportuno de Pensión Escolar (Octubre)",
-        description: "Cancelación de la pensión del mes de Octubre dentro de los 5 primeros días hábiles.",
-        category: "PENSION",
-        month: "Octubre",
-        dueDayOfMonth: 5,
-        dueDateMillis: Date.now() + (5 * 24 * 3600 * 1000),
-        isCompleted: false,
-        rewardBadgeKey: "PARENT_PENSION_OCTUBRE",
-        rewardBadgeTitle: "Pago Oportuno de Pensión (Octubre)",
-        rewardBadgeEmoji: "💳",
-        rewardCredits: 120,
-        rewardXp: 180,
-        whatsappMessage: "¡Hola estimado acudiente! 👋 Les recordamos que a partir de octubre la pensión se cancela dentro de los 5 primeros días del mes. ¡Paga a tiempo para ganar la insignia de Pago Oportuno 💳 y +120 créditos Escolaris para tu hijo/a! ⭐",
-        createdByTeacher: "Tesorería Escolar",
-        createdAt: firebase.firestore.FieldValue.serverTimestamp()
-      },
       {
         title: "Firma de Circular Informativa No. 04",
         description: "Revisión y firma digital de la circular de convivencia escolar institucional.",
@@ -1421,6 +1756,7 @@ function switchNav(tabId, isBack = false) {
     navHistory.push(currentTab);
   }
   currentTab = tabId;
+  try { sessionStorage.setItem('escolaris_active_tab', tabId); } catch(e) {}
 
   const allViews = [
     'view-feed',
@@ -1494,7 +1830,7 @@ function switchNav(tabId, isBack = false) {
     renderAdminBadges();
     renderAdminPasses();
     renderAdminPenalties();
-    renderAdminStudents();
+    renderAdminUsers();
   } else if (tabId === 'profile') {
     renderUserProfile();
     renderProfileBadges();
@@ -1698,6 +2034,7 @@ async function handleSignup(e) {
       avatarEmoji: selectedSignupRole === 'TEACHER' ? '👨‍🏫' : (selectedSignupRole === 'PARENT' ? '👨‍👩‍👧' : '🎓'),
       avatarColorHex: 0xFF2563EB,
       roleConfigured: true,
+      badges: getInitialBadgesForRole(selectedSignupRole),
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
     };
 
@@ -1711,6 +2048,11 @@ async function handleSignup(e) {
 
 async function handleSignOut() {
   if (confirm("¿Deseas cerrar tu sesión en Escolaris?")) {
+    document.documentElement.classList.remove('auth-restoring');
+    dataListenersAttached = false;
+    localStorage.removeItem('escolaris_cached_user');
+    localStorage.removeItem('escolaris_session_uid');
+    sessionStorage.removeItem('escolaris_active_tab');
     await auth.signOut();
     location.reload();
   }
@@ -1958,7 +2300,7 @@ function renderProfileStore() {
             `;
           }).join('')}
           <div style="text-align:center; margin-top:8px;">
-            <button class="btn-secondary btn-sm" onclick="switchTab('rewards')" style="font-size:11.5px; font-weight:800; width:100%;">
+            <button class="btn-secondary btn-sm" onclick="switchNav('rewards')" style="font-size:11.5px; font-weight:800; width:100%;">
               Ver las ${rewardsList.length} Recompensas en la Tienda Escolar ➔
             </button>
           </div>
@@ -2458,7 +2800,6 @@ async function handleSaveObligation(e) {
     closeModal('modal-edit-obligation');
     showToast("💾 Deber familiar actualizado correctamente");
     renderParentObligations();
-    renderParentDashboardObligations();
   } catch (err) {
     alert("Error al actualizar deber: " + err.message);
   }
@@ -2531,7 +2872,9 @@ async function handleCreateObligation(e) {
   const badgeKey = document.getElementById('obl-badge-key').value;
 
   try {
+    const nowId = Date.now();
     await db.collection('parent_obligations').add({
+      id: nowId,
       title: title,
       description: description,
       category: category,
@@ -2597,42 +2940,36 @@ async function handleBroadcastWhatsAppReminder(oblId) {
   }
 }
 
-// Automatic 2:00 PM WhatsApp Pension Reminder Engine
+// Automatic Monthly WhatsApp Pension Reminder Engine (Solo el día 1 de cada nuevo mes)
 function checkPensionReminder() {
   if (!currentUser || currentUser.role !== 'PARENT') return;
 
-  const pendingPension = allParentObligations.find(o => o.category === 'PENSION' && !o.isCompleted);
-  if (!pendingPension) return;
-
   const today = new Date();
   const dayOfMonth = today.getDate();
-  const currentHour = today.getHours();
 
-  // Rule: Days 1 to 5 daily around 2pm (14:00), after day 5 every 3 days
-  const shouldNotify = (dayOfMonth <= 5) || (dayOfMonth > 5 && (dayOfMonth % 3 === 0));
+  // Regla: la app solo envía un mensaje el 1 de cada nuevo mes avisando que la pensión se paga los primeros 5 días
+  if (dayOfMonth !== 1) return;
 
-  if (shouldNotify) {
-    const alertEl = document.getElementById('whatsapp-live-alert');
-    const alertText = document.getElementById('whatsapp-alert-text');
-    if (alertEl && alertText) {
-      alertText.textContent = pendingPension.whatsappMessage || `Recordatorio: Cancelación oportuna de pensión escolar (${pendingPension.month || 'Octubre'})`;
-      alertEl.classList.add('show');
-      setTimeout(() => alertEl.classList.remove('show'), 7000);
-    }
+  const months = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+  const monthName = months[today.getMonth()];
+  const msg = `¡Hola estimado acudiente! 👋 Les recordamos que la pensión escolar de ${monthName} se cancela dentro de los primeros 5 días del mes. ¡Gracias por tu puntualidad! ⭐`;
 
-    // Request native web notification if not yet granted
-    if ("Notification" in window) {
-      if (Notification.permission === "default") {
-        Notification.requestPermission();
-      } else if (Notification.permission === "granted") {
-        try {
-          new Notification("Colegio Escolaris • Tesorería (2:00 PM)", {
-            body: pendingPension.whatsappMessage || "Recordatorio de pensión escolar. ¡Paga a tiempo y gana recompensas!",
-            icon: "/icons/icon-192.png"
-          });
-        } catch (e) {}
-      }
-    }
+  const alertEl = document.getElementById('whatsapp-live-alert');
+  const alertText = document.getElementById('whatsapp-alert-text');
+  if (alertEl && alertText) {
+    alertText.textContent = msg;
+    alertEl.classList.add('show');
+    setTimeout(() => alertEl.classList.remove('show'), 7000);
+  }
+
+  // Notificación del navegador si está permitida
+  if ("Notification" in window && Notification.permission === "granted") {
+    try {
+      new Notification("Colegio Escolaris • Recordatorio de Pensión", {
+        body: msg,
+        icon: "/icons/icon-192.png"
+      });
+    } catch (e) {}
   }
 }
 
@@ -2907,14 +3244,6 @@ function renderAdminUsers() {
     const code = role === 'TEACHER' ? (u.teacherCode || 'DOC-...') : (u.studentCode || 'ESC-...');
     const extraInfo = role === 'TEACHER' ? (u.teacherSubject || 'Docente Titular') : (role === 'PARENT' ? (u.linkedStudentId ? `Hijo enlazado: ${u.linkedStudentId}` : 'Sin hijo vinculado') : `${u.gradeSection || '10° Grado'}${u.linkedTeacherCode ? ` • Aula: ${u.linkedTeacherCode}` : ''}`);
 
-    let familyPensionPill = '';
-    if (role === 'STUDENT' || role === 'PARENT') {
-      const isPaid = allParentObligations.some(o => o.category === 'PENSION' && o.isCompleted);
-      familyPensionPill = isPaid 
-        ? `<span class="badge" style="background:#dcfce7; color:#15803d; font-size:10px; font-weight:800;">💳 Pensión al Día ✅</span>`
-        : `<span class="badge" style="background:#fef3c7; color:#b45309; font-size:10px; font-weight:800;">⏰ Pensión Pendiente</span>`;
-    }
-
     return `
       <div class="admin-user-card">
         <div class="admin-user-left">
@@ -2923,7 +3252,6 @@ function renderAdminUsers() {
             <div class="admin-user-name">
               <span>${u.name || 'Sin Nombre'}</span>
               ${roleBadge}
-              ${familyPensionPill}
             </div>
             <div class="admin-user-meta">
               <span>📧 ${u.email || 'Sin correo'}</span>
@@ -3510,6 +3838,53 @@ async function handleRevokePenalty(penaltyId) {
   }
 }
 
+function renderAdminTardies() {
+  const container = document.getElementById('admin-tardies-list');
+  if (!container) return;
+
+  if (!allTardies || allTardies.length === 0) {
+    container.innerHTML = `
+      <div class="clay-card" style="text-align:center; padding:24px;">
+        <span style="font-size:32px;">⏰</span>
+        <p style="font-size:13px; color:var(--text-muted); margin-top:8px;">No hay registros de llegadas tarde.</p>
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = allTardies.map(td => {
+    const isJustified = td.status === 'JUSTIFICADO';
+    const dateStr = td.dateMillis ? new Date(td.dateMillis).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : (td.arrivalTime || 'Hoy');
+    return `
+      <div class="clay-card card-actionable" style="display:flex; justify-content:space-between; align-items:center; padding:12px 16px; margin-bottom:8px; border-left: 4px solid ${isJustified ? 'var(--success)' : 'var(--streak-orange)'};">
+        <div>
+          <div style="font-weight:800; font-size:14px; color:var(--text-main);">${escapeHtml(td.studentName || 'Estudiante')}</div>
+          <div style="font-size:12px; color:var(--text-muted); margin-top:2px;">
+            <span>${escapeHtml(td.subject || 'Clase')}</span> • <span>${dateStr}</span> • <span style="color:${isJustified ? 'var(--success)' : '#ef4444'}; font-weight:700;">+${td.delayMinutes || 15} min</span>
+          </div>
+          ${td.reason ? `<div style="font-size:11px; color:var(--text-muted); font-style:italic; margin-top:2px;">Motivo: ${escapeHtml(td.reason)}</div>` : ''}
+        </div>
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span class="badge" style="background:${isJustified ? '#dcfce7' : '#fee2e2'}; color:${isJustified ? '#166534' : '#991b1b'}; font-weight:800; font-size:11px;">${td.status || 'REGISTRADO'}</span>
+          ${!isJustified ? `<button class="btn-secondary btn-sm" onclick="justifyTardy('${td.id}')" style="font-size:11px; padding:4px 8px;">Justificar</button>` : ''}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+async function justifyTardy(tardyId) {
+  try {
+    await db.collection('tardies').doc(tardyId).update({
+      status: 'JUSTIFICADO',
+      justifiedAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    showToast("✅ Retardo marcado como justificado");
+  } catch (err) {
+    alert("Error al justificar retardo: " + err.message);
+  }
+}
+
 function renderAdminPenalties() {
   const container = document.getElementById('admin-penalties-list');
   if (!container) return;
@@ -3715,30 +4090,141 @@ async function handleRegisterTardy(e) {
   }
 }
 
+function timeAgo(millis) {
+  if (!millis) return 'Reciente';
+  const num = Number(millis);
+  if (isNaN(num) || num <= 0) return 'Reciente';
+  const diff = Math.floor((Date.now() - num) / 1000);
+  if (diff < 60) return 'Hace un momento';
+  if (diff < 3600) return `Hace ${Math.floor(diff / 60)} min`;
+  if (diff < 86400) return `Hace ${Math.floor(diff / 3600)} h`;
+  if (diff < 604800) return `Hace ${Math.floor(diff / 86400)} d`;
+  return new Date(num).toLocaleDateString('es-CO', { day: '2-digit', month: 'short' });
+}
+
 // 11. Feed Logic (With Desktop Widget Previews)
+function matchesCategory(post, filter) {
+  if (!filter || filter === 'all' || filter === 'todos') return true;
+
+  const postCat = (post.category || post.postType || '').trim().toLowerCase();
+  const activeFilter = filter.trim().toLowerCase();
+
+  // Mapeo para "Avisos" (contempla sinónimos de Android y Web)
+  if (activeFilter === 'avisos' || activeFilter === 'aviso' || activeFilter === 'announcement' || activeFilter === 'general') {
+    return (
+      postCat === 'avisos' ||
+      postCat === 'aviso' ||
+      postCat === 'announcement' ||
+      postCat === 'general' ||
+      postCat === 'comunicado' ||
+      postCat.includes('aviso') ||
+      postCat.includes('comunicado')
+    );
+  }
+
+  // Mapeo para "Tareas & Exámenes"
+  if (activeFilter.includes('tarea') || activeFilter.includes('examen') || activeFilter === 'academic' || activeFilter === 'task') {
+    return (
+      postCat.includes('tarea') ||
+      postCat.includes('examen') ||
+      postCat === 'academic' ||
+      postCat === 'task' ||
+      postCat === 'study' ||
+      postCat.includes('estudio') ||
+      postCat === 'late_help' ||
+      postCat.includes('apunte')
+    );
+  }
+
+  return postCat === activeFilter;
+}
+window.matchesCategory = matchesCategory;
+
+function filterFeed(filter) {
+  currentFeedFilter = filter || 'todos';
+  const filterNorm = currentFeedFilter.trim().toLowerCase();
+
+  // Actualizar estilos activos de los botones de filtro
+  const buttons = document.querySelectorAll('.feed-filter-bar .btn-filter');
+  buttons.forEach(btn => {
+    btn.classList.remove('btn-primary', 'active');
+    btn.classList.add('btn-secondary');
+  });
+
+  let targetId = 'btn-feed-filter-todos';
+  if (filterNorm === 'avisos' || filterNorm === 'aviso' || filterNorm === 'announcement') {
+    targetId = 'btn-feed-filter-avisos';
+  } else if (filterNorm.includes('tarea') || filterNorm.includes('examen') || filterNorm === 'academic') {
+    targetId = 'btn-feed-filter-tareas';
+  }
+
+  const activeBtn = document.getElementById(targetId);
+  if (activeBtn) {
+    activeBtn.classList.remove('btn-secondary');
+    activeBtn.classList.add('btn-primary', 'active');
+  }
+
+  renderFeed();
+}
+window.filterFeed = filterFeed;
+window.setFeedFilter = filterFeed;
+
 function renderFeed() {
   const container = document.getElementById('feed-posts-list');
   if (container) {
     if (feedPosts.length === 0) {
       container.innerHTML = `<p style="font-size:12px; color:var(--text-muted); text-align:center; padding:20px;">No hay publicaciones en el muro aún.</p>`;
     } else {
-      container.innerHTML = feedPosts.map(p => `
-        <div class="clay-card feed-card">
-          <div class="post-header">
-            <div class="post-avatar">${p.authorEmoji || '🎓'}</div>
-            <div class="post-user-info">
-              <div class="post-author-name">${p.authorName || 'Estudiante'}</div>
-              <div class="post-time">${p.authorRole || 'Comunidad'} • ${timeAgo(p.timestampMillis)}</div>
+      const filteredPosts = feedPosts.filter(p => matchesCategory(p, currentFeedFilter));
+
+      if (filteredPosts.length === 0) {
+        container.innerHTML = `<p style="font-size:12px; color:var(--text-muted); text-align:center; padding:20px;">No hay publicaciones en esta categoría.</p>`;
+      } else {
+        const isTeacherOrAdmin = currentUser && (
+          currentUser.role === 'TEACHER' ||
+          currentUser.role === 'DOCENTE' ||
+          currentUser.role === 'ADMIN' ||
+          currentUser.role === 'SUPERADMIN' ||
+          currentUser.email === 'moz658@gmail.com'
+        );
+        container.innerHTML = filteredPosts.map(p => {
+          const canDelete = isTeacherOrAdmin || (currentUser && (currentUser.id === p.authorId || currentUser.uid === p.authorId));
+          return `
+        <article class="feed-card">
+          <!-- Cabecera: Avatar y datos del autor -->
+          <header class="feed-card-header">
+            <div class="feed-avatar-badge">${p.authorEmoji || '👨‍🏫'}</div>
+            <div class="feed-author-meta">
+              <div class="feed-author-name-row">
+                <h4 class="feed-author-name">${escapeHtml(p.authorName || 'Usuario')}</h4>
+                <span class="feed-role-pill ${p.authorRole?.includes('Docente') || p.authorRole?.toUpperCase() === 'TEACHER' ? 'role-teacher' : 'role-student'}">
+                  ${escapeHtml(p.authorRole || 'Comunidad')}
+                </span>
+              </div>
+              <span class="feed-time">${timeAgo(p.timestampMillis || p.timestamp)}</span>
             </div>
+            <div style="display:flex; align-items:center; gap:8px;">
+              <div class="feed-category-tag">${escapeHtml(p.category || p.postType || 'General')}</div>
+              ${canDelete ? `<button onclick="handleDeletePost('${p.id}')" title="Eliminar publicación" style="background:none; border:none; cursor:pointer; font-size:15px; opacity:0.6; padding:2px 4px; border-radius:4px;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.6'">🗑️</button>` : ''}
+            </div>
+          </header>
+
+          <!-- Cuerpo: Contenido del mensaje -->
+          <div class="feed-card-body">
+            <p class="feed-content-text">${escapeHtml(p.content || '')}</p>
           </div>
-          <div class="post-content">${escapeHtml(p.content)}</div>
-          <div class="post-actions-row">
-            <button class="post-action-btn" onclick="likePost('${p.id}', ${(p.likes || 0) + 1})">
-              ❤️ ${p.likes || 0}
+
+          <!-- Pie: Interacciones -->
+          <footer class="feed-card-footer">
+            <button class="feed-like-btn" onclick="handleLikePost('${p.id}')">
+              <span class="heart-icon">❤️</span>
+              <span class="like-count">${p.likes || p.likesCount || 0}</span>
             </button>
-          </div>
-        </div>
-      `).join('');
+          </footer>
+        </article>
+      `;
+        }).join('');
+      }
     }
   }
 
@@ -3814,13 +4300,17 @@ function renderFeed() {
   if (rankingWidget) {
     const topStudents = leaderboardUsers.filter(u => u.role === 'STUDENT' || !u.role).slice(0, 3);
     if (topStudents.length === 0) {
-      rankingWidget.innerHTML = `<p style="font-size:11px; color:var(--text-muted);">Cargando ranking...</p>`;
+      if (allUsers.length === 0) {
+        rankingWidget.innerHTML = `<p style="font-size:11px; color:var(--text-muted);">Cargando ranking...</p>`;
+      } else {
+        rankingWidget.innerHTML = `<p style="font-size:11px; color:var(--text-muted);">Sin estudiantes en ranking aún</p>`;
+      }
     } else {
       rankingWidget.innerHTML = topStudents.map((u, i) => `
         <div style="display:flex; justify-content:space-between; align-items:center; padding:6px 0; font-size:11px;">
           <div style="display:flex; align-items:center; gap:6px;">
             <span style="font-weight:800; color:var(--primary);">${i === 0 ? '🥇' : (i === 1 ? '🥈' : '🥉')}</span>
-            <span>${u.name}</span>
+            <span>${escapeHtml(u.name || 'Estudiante')}</span>
           </div>
           <span style="font-weight:800; color:var(--primary); font-size:10px;">${u.xp || 0} XP</span>
         </div>
@@ -3831,9 +4321,57 @@ function renderFeed() {
 
 async function likePost(postId, newLikes) {
   try {
-    await db.collection('feed_posts').doc(postId).update({ likes: newLikes });
-  } catch (e) {}
+    await db.collection('feed_posts').doc(postId).update({ 
+      likes: newLikes,
+      likesCount: newLikes
+    });
+  } catch (e) {
+    console.error("Error al actualizar likes:", e);
+  }
 }
+window.likePost = likePost;
+
+async function handleLikePost(postId) {
+  const p = feedPosts.find(x => x.id === postId);
+  const currentLikes = p ? (p.likes || p.likesCount || 0) : 0;
+  await likePost(postId, currentLikes + 1);
+}
+window.handleLikePost = handleLikePost;
+
+async function handleDeletePost(postId) {
+  if (!confirm('¿Estás seguro de que deseas eliminar esta publicación del muro escolar?')) return;
+  try {
+    const postDocRef = db.collection('feed_posts').doc(postId.toString());
+    await postDocRef.delete();
+
+    // Eliminar comentarios asociados en Firestore
+    const numericId = Number(postId);
+    const commentsSnap = await db.collection('post_comments').get();
+    const batch = db.batch();
+    let hasCommentsToDelete = false;
+    commentsSnap.forEach(doc => {
+      const c = doc.data();
+      if (c.postId == postId || (numericId && c.postId == numericId)) {
+        batch.delete(doc.ref);
+        hasCommentsToDelete = true;
+      }
+    });
+    if (hasCommentsToDelete) {
+      await batch.commit();
+    }
+    if (typeof showToast === 'function') {
+      showToast('Publicación eliminada correctamente', 'success');
+    }
+  } catch (err) {
+    console.error('Error eliminando publicación:', err);
+    if (typeof showToast === 'function') {
+      showToast('Error al eliminar publicación: ' + err.message, 'danger');
+    } else {
+      alert('Error al eliminar: ' + err.message);
+    }
+  }
+}
+window.handleDeletePost = handleDeletePost;
 
 async function handleCreatePost(e) {
   e.preventDefault();
@@ -3843,15 +4381,22 @@ async function handleCreatePost(e) {
   const content = subject ? `[${subject}] ${rawContent}` : rawContent;
 
   try {
-    await db.collection('feed_posts').add({
+    const postRef = db.collection('feed_posts').doc();
+    const now = Date.now();
+    await postRef.set({
+      id: postRef.id,
+      title: subject ? `[${subject}] ${category}` : (category || 'Aviso Escolar'),
       category: category,
+      postType: category,
       subject: subject || null,
       content: content,
       authorName: currentUser ? currentUser.name : 'Usuario',
       authorRole: currentUser ? (currentUser.role === 'TEACHER' ? `Docente • ${currentUser.teacherSubject || 'Titular'}` : `Estudiante • ${currentUser.gradeSection || '10°'}`) : 'Comunidad',
       authorEmoji: currentUser ? currentUser.avatarEmoji : '🎓',
       likes: 0,
-      timestampMillis: Date.now(),
+      likesCount: 0,
+      timestamp: now,
+      timestampMillis: now,
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
     });
 
@@ -3885,8 +4430,9 @@ function renderTasks() {
   const isExamView = activeTaskFilter === 'exams';
 
   let filtered = userTasks.filter(t => {
+    const isDone = (t.completed === true || t.status === 'COMPLETED');
     if (isExamView) return t.isExam === true;
-    return isCompletedView ? t.completed === true : !t.completed;
+    return isCompletedView ? isDone : !isDone;
   });
 
   if (filtered.length === 0) {
@@ -3894,32 +4440,40 @@ function renderTasks() {
     return;
   }
 
-  container.innerHTML = filtered.map(t => `
-    <div class="clay-card task-item ${t.completed ? 'completed' : ''}">
-      ${currentUser && currentUser.role !== 'PARENT' ? `
-        <div class="task-checkbox ${t.completed ? 'checked' : ''}" onclick="toggleTaskStatus('${t.id}', ${!t.completed})">
-          ${t.completed ? '✓' : ''}
-        </div>
-      ` : `<div style="font-size:18px;">${t.completed ? '✅' : '⏳'}</div>`}
-      <div class="task-info">
-        <div class="task-title">${escapeHtml(t.title)}</div>
-        <div class="task-meta">
-          <span>${t.subject}</span> • <span>Entrega: ${t.dueDate || 'Sin fecha'}</span>
-          <span class="badge badge-priority-${(t.priority || 'media').toLowerCase()}">${t.priority || 'Media'}</span>
+  container.innerHTML = filtered.map(t => {
+    const isDone = (t.completed === true || t.status === 'COMPLETED');
+    const formattedDate = t.dueDate || (t.dueDateMillis ? new Date(t.dueDateMillis).toLocaleDateString('es-CO') : 'Sin fecha');
+    return `
+      <div class="clay-card task-item ${isDone ? 'completed' : ''}">
+        ${currentUser && currentUser.role !== 'PARENT' ? `
+          <div class="task-checkbox ${isDone ? 'checked' : ''}" onclick="toggleTaskStatus('${t.id}', ${!isDone})">
+            ${isDone ? '✓' : ''}
+          </div>
+        ` : `<div style="font-size:18px;">${isDone ? '✅' : '⏳'}</div>`}
+        <div class="task-info">
+          <div class="task-title">${escapeHtml(t.title)}</div>
+          <div class="task-meta">
+            <span>${t.subject}</span> • <span>Entrega: ${formattedDate}</span>
+            <span class="badge badge-priority-${(t.priority || 'media').toLowerCase()}">${t.priority || 'Media'}</span>
+          </div>
         </div>
       </div>
-    </div>
-  `).join('');
+    `;
+  }).join('');
 }
 
 async function toggleTaskStatus(taskId, completed) {
   try {
-    const taskObj = allTasks.find(t => t.id === taskId);
+    const taskObj = userTasks.find(t => t.id === taskId);
     const isHighPriority = taskObj && (taskObj.priority === 'ALTA' || taskObj.priority === 'High');
     const rewardCredits = isHighPriority ? 40 : 30;
     const rewardXp = isHighPriority ? 80 : 60;
 
-    await db.collection('tasks').doc(taskId).update({ completed: completed });
+    await db.collection('tasks').doc(taskId).update({
+      completed: completed,
+      status: completed ? 'COMPLETED' : 'PENDING'
+    });
+
     if (completed && currentUser) {
       const newCredits = (currentUser.credits || 0) + rewardCredits;
       const newXp = (currentUser.xp || 0) + rewardXp;
@@ -3934,7 +4488,9 @@ async function toggleTaskStatus(taskId, completed) {
       renderRewards();
       renderProfileStore();
     }
-  } catch (e) {}
+  } catch (e) {
+    console.error("Error toggling task status:", e);
+  }
 }
 
 async function handleCreateTask(e) {
@@ -3947,14 +4503,19 @@ async function handleCreateTask(e) {
   const desc = document.getElementById('task-desc').value.trim();
 
   try {
+    const dueMillis = dueDate ? new Date(dueDate + 'T23:59:59').getTime() : Date.now();
     await db.collection('tasks').add({
       title: title,
       subject: subject,
       dueDate: dueDate,
+      dueDateMillis: dueMillis,
       priority: priority,
       description: desc,
       isExam: type === 'EXAM',
       completed: false,
+      status: 'PENDING',
+      studentId: 'ALL',
+      rewardCredits: priority === 'ALTA' ? 40 : 30,
       createdBy: currentUser ? currentUser.name : 'Docente',
       timestampMillis: Date.now(),
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
@@ -4418,6 +4979,14 @@ function renderLeaderboard() {
   if (!container) return;
 
   const students = leaderboardUsers.filter(u => u.role === 'STUDENT' || !u.role);
+  if (students.length === 0) {
+    if (allUsers.length === 0) {
+      container.innerHTML = `<p style="font-size:12px; color:var(--text-muted); text-align:center; padding:20px;">Cargando tabla de honor...</p>`;
+    } else {
+      container.innerHTML = `<p style="font-size:12px; color:var(--text-muted); text-align:center; padding:20px;">No hay estudiantes registrados en la tabla de honor aún.</p>`;
+    }
+    return;
+  }
 
   container.innerHTML = students.slice(0, 10).map((u, i) => {
     let rankBadgeClass = '';
@@ -4430,11 +4999,12 @@ function renderLeaderboard() {
         <div class="rank-badge ${rankBadgeClass}">${i + 1}</div>
         <div style="font-size: 24px;">${u.avatarEmoji || '🎓'}</div>
         <div class="task-info">
-          <div class="task-title">${u.name || 'Estudiante'}</div>
-          <div class="task-meta">${u.gradeSection || '10° Grado'} • 🔥 ${u.streakDays || 1} días</div>
+          <div class="task-title">${escapeHtml(u.name || 'Estudiante')}</div>
+          <div class="task-meta">${escapeHtml(u.gradeSection || '10° Grado')} • 🔥 ${u.streakDays || 1} días</div>
         </div>
-        <div style="font-weight: 800; font-size: 13px; color: var(--primary);">
-          ${u.xp || 0} XP
+        <div style="font-weight: 800; font-size: 13px; color: var(--primary); text-align: right;">
+          <div>${u.xp || 0} XP</div>
+          <div style="font-size: 11px; color: var(--text-muted); font-weight: 600;">🪙 ${u.credits || 0}</div>
         </div>
       </div>
     `;
@@ -4449,14 +5019,33 @@ function renderProfileBadges() {
   const presets = isParent ? familyBadgePresets : studentBadgePresets;
   const myBadges = allBadges.filter(b => (isParent ? (b.studentId === currentUser.id || b.category === 'FAMILY') : b.studentId === currentUser.id));
 
+  const userBadgesMap = {};
+  if (currentUser.badges && Array.isArray(currentUser.badges)) {
+    currentUser.badges.forEach(b => {
+      if (b.id) userBadgesMap[b.id.toUpperCase()] = b;
+      if (b.title) userBadgesMap[b.title.trim().toLowerCase()] = b;
+    });
+  }
+
   const unlockedMap = {};
   myBadges.forEach(b => {
     if (b.badgeKey) unlockedMap[b.badgeKey.toUpperCase()] = b;
     if (b.title) unlockedMap[b.title.trim().toLowerCase()] = b;
   });
+  if (currentUser.badges && Array.isArray(currentUser.badges)) {
+    currentUser.badges.forEach(b => {
+      if (b.isUnlocked) {
+        if (b.id) unlockedMap[b.id.toUpperCase()] = b;
+        if (b.title) unlockedMap[b.title.trim().toLowerCase()] = b;
+      }
+    });
+  }
 
-  const unlockedCount = myBadges.length;
   const totalCount = presets.length;
+  const unlockedCount = presets.filter(p => {
+    const ub = userBadgesMap[(p.id || '').toUpperCase()] || userBadgesMap[(p.key || '').toUpperCase()] || userBadgesMap[p.title.trim().toLowerCase()];
+    return unlockedMap[p.key.toUpperCase()] || unlockedMap[p.title.trim().toLowerCase()] || (ub && ub.isUnlocked);
+  }).length;
   const progressPercent = totalCount > 0 ? Math.min(100, Math.round((unlockedCount / totalCount) * 100)) : 0;
 
   let html = `
@@ -4474,14 +5063,20 @@ function renderProfileBadges() {
         <div style="width:${progressPercent}%; height:100%; background:var(--primary); transition:width 0.4s ease;"></div>
       </div>
       <div style="margin-top:8px; font-size:10.5px; color:var(--text-muted); line-height:1.3;">
-        ✨ <em>Las ganadas brillan a todo color. Las bloqueadas aparecen en baja opacidad con su reto para desbloquear.</em>
+        ✨ <em>Las ganadas brillan a todo color. Las bloqueadas aparecen en baja opacidad con su reto y progreso para desbloquear.</em>
       </div>
     </div>
   `;
 
   // Render presets
   html += presets.map(p => {
-    const earned = unlockedMap[p.key.toUpperCase()] || unlockedMap[p.title.trim().toLowerCase()];
+    const userBadge = userBadgesMap[(p.id || '').toUpperCase()] || userBadgesMap[(p.key || '').toUpperCase()] || userBadgesMap[p.title.trim().toLowerCase()];
+    const earned = unlockedMap[p.key.toUpperCase()] || unlockedMap[p.title.trim().toLowerCase()] || (userBadge && userBadge.isUnlocked);
+    const curProg = earned ? (userBadge?.targetProgress || p.targetProgress || 1) : (userBadge ? (userBadge.currentProgress || 0) : (p.currentProgress || 0));
+    const tgtProg = userBadge ? (userBadge.targetProgress || p.targetProgress || 1) : (p.targetProgress || 1);
+    const progFraction = tgtProg > 0 ? Math.min(1, curProg / tgtProg) : 0;
+    const progPct = Math.round(progFraction * 100);
+
     if (earned) {
       return `
         <div class="clay-card ${earned.category === 'FAMILY' ? 'family-badge-card' : ''}" style="padding:12px 14px; margin-bottom:8px; border-left:4px solid #10b981;">
@@ -4498,25 +5093,31 @@ function renderProfileBadges() {
                 ${earned.teacherNote ? `<p style="font-size:10.5px; color:#6b21a8; font-style:italic; margin-top:2px;">"${escapeHtml(earned.teacherNote)}"</p>` : ''}
               </div>
             </div>
-            <span class="reward-price" style="font-size:12px; font-weight:800; white-space:nowrap; margin-left:8px;">+${earned.creditReward || 50} 🪙</span>
+            <span class="reward-price" style="font-size:12px; font-weight:800; white-space:nowrap; margin-left:8px;">+${earned.creditReward || p.creditReward || 50} 🪙</span>
           </div>
         </div>
       `;
     } else {
       return `
-        <div class="clay-card" style="padding:12px 14px; margin-bottom:8px; opacity:0.42; filter:grayscale(70%); border:1px dashed #cbd5e1; cursor:pointer;" onclick="showToast('🔒 Reto: ${escapeHtml(p.desc)}')">
+        <div class="clay-card" style="padding:12px 14px; margin-bottom:8px; opacity:0.6; filter:grayscale(60%); border:1px dashed #cbd5e1; cursor:pointer;" onclick="showToast('🔒 Reto: ${escapeHtml(p.desc)}')">
           <div style="display:flex; justify-content:space-between; align-items:center;">
-            <div style="display:flex; align-items:center; gap:10px;">
+            <div style="display:flex; align-items:center; gap:10px; width:100%;">
               <span style="font-size:24px;">${p.emoji || '🎖️'}</span>
-              <div>
-                <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+              <div style="flex:1;">
+                <div style="display:flex; align-items:center; justify-content:space-between; gap:6px; flex-wrap:wrap;">
                   <strong style="font-size:13px; color:var(--text-main);">${escapeHtml(p.title)}</strong>
-                  <span class="badge" style="background:#f1f5f9; color:#64748b; font-size:10px; font-weight:800;">🔒 Bloqueada</span>
+                  <span class="badge" style="background:#f1f5f9; color:#64748b; font-size:10px; font-weight:800;">🔒 Bloqueada (${curProg}/${tgtProg})</span>
                 </div>
                 <p style="font-size:11px; color:var(--text-muted); margin-top:2px;">🎯 <strong>Reto:</strong> ${escapeHtml(p.desc)}</p>
+                <div style="margin-top:6px; display:flex; align-items:center; gap:8px;">
+                  <div style="flex:1; height:6px; background:rgba(0,0,0,0.06); border-radius:99px; overflow:hidden;">
+                    <div style="width:${progPct}%; height:100%; background:var(--primary); transition:width 0.3s ease;"></div>
+                  </div>
+                  <span style="font-size:10px; font-weight:800; color:var(--text-muted);">${curProg} / ${tgtProg}</span>
+                </div>
               </div>
             </div>
-            <span style="font-size:11px; font-weight:700; color:var(--text-muted); white-space:nowrap; margin-left:8px;">+50 🪙</span>
+            <span style="font-size:11px; font-weight:700; color:var(--text-muted); white-space:nowrap; margin-left:8px;">+${p.creditReward || 50} 🪙</span>
           </div>
         </div>
       `;

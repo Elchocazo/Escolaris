@@ -6,6 +6,7 @@ import androidx.room.PrimaryKey
 @Entity(tableName = "tardy_records")
 data class TardyRecordEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val firestoreId: String = "",
     val studentId: String,
     val studentName: String,
     val gradeSection: String = "10° Grado - Sección A",

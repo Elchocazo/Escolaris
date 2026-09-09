@@ -115,7 +115,6 @@ object EscolarisBackupManager {
     // MURO SOCIAL (FEED POSTS)
     // ==========================================
     fun saveFeedPostsBackup(context: Context, posts: List<FeedPostEntity>) {
-        if (posts.isEmpty()) return
         try {
             val jsonArray = JSONArray()
             for (post in posts) {
@@ -143,6 +142,26 @@ object EscolarisBackupManager {
                 .edit()
                 .putString(KEY_FEED_POSTS, jsonArray.toString())
                 .apply()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    fun deletePostFromBackup(context: Context, postId: Long) {
+        try {
+            val currentPosts = restoreFeedPostsBackup(context)
+            val filtered = currentPosts.filter { it.id != postId }
+            saveFeedPostsBackup(context, filtered)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    fun pruneFeedPostsBackup(context: Context, validIds: Set<Long>) {
+        try {
+            val currentPosts = restoreFeedPostsBackup(context)
+            val filtered = currentPosts.filter { it.id in validIds }
+            saveFeedPostsBackup(context, filtered)
         } catch (e: Exception) {
             e.printStackTrace()
         }
@@ -189,7 +208,6 @@ object EscolarisBackupManager {
     // COMENTARIOS DE PUBLICACIONES
     // ==========================================
     fun savePostCommentsBackup(context: Context, comments: List<PostCommentEntity>) {
-        if (comments.isEmpty()) return
         try {
             val jsonArray = JSONArray()
             for (c in comments) {
@@ -209,6 +227,36 @@ object EscolarisBackupManager {
                 .edit()
                 .putString(KEY_POST_COMMENTS, jsonArray.toString())
                 .apply()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    fun deleteCommentFromBackup(context: Context, commentId: Long) {
+        try {
+            val currentComments = restorePostCommentsBackup(context)
+            val filtered = currentComments.filter { it.id != commentId }
+            savePostCommentsBackup(context, filtered)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    fun deleteCommentsForPostFromBackup(context: Context, postId: Long) {
+        try {
+            val currentComments = restorePostCommentsBackup(context)
+            val filtered = currentComments.filter { it.postId != postId }
+            savePostCommentsBackup(context, filtered)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    fun prunePostCommentsBackup(context: Context, validIds: Set<Long>) {
+        try {
+            val currentComments = restorePostCommentsBackup(context)
+            val filtered = currentComments.filter { it.id in validIds }
+            savePostCommentsBackup(context, filtered)
         } catch (e: Exception) {
             e.printStackTrace()
         }
@@ -311,6 +359,17 @@ object EscolarisBackupManager {
             e.printStackTrace()
         }
         return result
+    }
+
+    fun clearBadgesBackup(context: Context) {
+        try {
+            context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .edit()
+                .remove(KEY_BADGES)
+                .apply()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 
     // ==========================================

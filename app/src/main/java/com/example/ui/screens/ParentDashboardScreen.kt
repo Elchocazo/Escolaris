@@ -101,7 +101,6 @@ fun ParentDashboardScreen(
     val parentObligations by viewModel.parentObligations.collectAsState()
 
     var showLinkStudentDialog by remember { mutableStateOf(false) }
-    var showTransferPointsDialog by remember { mutableStateOf(false) }
     var selectedBadgeDetail by remember { mutableStateOf<BadgeEntity?>(null) }
     var selectedParentTab by remember { mutableIntStateOf(0) } // 0: Pendientes, 1: Cumplidas & Medallas, 2: Académico
     var obligationToComplete by remember { mutableStateOf<ParentObligationEntity?>(null) }
@@ -592,52 +591,6 @@ fun ParentDashboardScreen(
                 // TAB 2: 📊 SEGUIMIENTO ACADÉMICO DEL HIJO/A
                 // ====================================================
                 if (selectedParentTab == 2) {
-                    // Tarjeta de Ceder / Transferir Puntos
-                    item {
-                        Surface(
-                            shape = RoundedCornerShape(18.dp),
-                            color = GoldStar.copy(alpha = 0.12f),
-                            border = BorderStroke(1.2.dp, GoldStar.copy(alpha = 0.4f)),
-                            shadowElevation = 0.dp,
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Text("🎁", fontSize = 18.sp)
-                                        Spacer(modifier = Modifier.width(6.dp))
-                                        Text(
-                                            text = "Incentivos y Escolaris Familiares",
-                                            fontWeight = FontWeight.Bold,
-                                            style = MaterialTheme.typography.titleSmall,
-                                            color = MaterialTheme.colorScheme.onSurface
-                                        )
-                                    }
-                                    Text(
-                                        text = "Tienes 🪙 $parentBalance Escolaris para premiar a ${student?.name ?: "tu hijo/a"}",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.outline
-                                    )
-                                }
-
-                                Button(
-                                    onClick = { showTransferPointsDialog = true },
-                                    shape = RoundedCornerShape(10.dp),
-                                    colors = ButtonDefaults.buttonColors(containerColor = GoldStar, contentColor = Color.Black),
-                                    contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp, vertical = 6.dp)
-                                ) {
-                                    Text("Ceder Escolaris 🚀", fontSize = 12.sp, fontWeight = FontWeight.ExtraBold)
-                                }
-                            }
-                        }
-                    }
-
                     // Resumen de Métricas Clave
                     item {
                         Row(
@@ -874,92 +827,6 @@ fun ParentDashboardScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showLinkStudentDialog = false }) {
-                    Text("Cancelar")
-                }
-            }
-        )
-    }
-
-    // Diálogo para Ceder / Transferir Escolaris al Hijo/a
-    if (showTransferPointsDialog && student != null) {
-        var selectedAmountStr by remember { mutableStateOf("25") }
-        var reasonText by remember { mutableStateOf("¡Excelente desempeño escolar y apoyo en casa!") }
-
-        AlertDialog(
-            onDismissRequest = { showTransferPointsDialog = false },
-            title = {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("🎁", fontSize = 24.sp)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Ceder Escolaris a ${student.name}", fontWeight = FontWeight.Bold)
-                }
-            },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text(
-                        text = "Saldo disponible: 🪙 $parentBalance Escolaris",
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFFB45309)
-                    )
-
-                    Text("Selecciona una cantidad rápida a transferir:", style = MaterialTheme.typography.labelMedium)
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        listOf("10", "25", "50", "100").forEach { amt ->
-                            val isSelected = selectedAmountStr == amt
-                            Button(
-                                onClick = { selectedAmountStr = amt },
-                                colors = if (isSelected) ButtonDefaults.buttonColors(containerColor = GoldStar, contentColor = Color.Black) else ButtonDefaults.filledTonalButtonColors(),
-                                shape = RoundedCornerShape(10.dp),
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Text("+$amt 🪙", fontWeight = FontWeight.Bold, fontSize = 11.sp)
-                            }
-                        }
-                    }
-
-                    OutlinedTextField(
-                        value = selectedAmountStr,
-                        onValueChange = { selectedAmountStr = it.filter { c -> c.isDigit() } },
-                        label = { Text("Cantidad personalizada (🪙 Escolaris)") },
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true
-                    )
-
-                    OutlinedTextField(
-                        value = reasonText,
-                        onValueChange = { reasonText = it },
-                        label = { Text("Mensaje o motivo de reconocimiento") },
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-            },
-            confirmButton = {
-                val amt = selectedAmountStr.toIntOrNull() ?: 0
-                val canSubmit = amt in 1..parentBalance
-                Button(
-                    onClick = {
-                        if (amt > 0) {
-                            viewModel.transferParentPointsToChild(amt, reasonText)
-                            showTransferPointsDialog = false
-                        }
-                    },
-                    enabled = canSubmit,
-                    colors = ButtonDefaults.buttonColors(containerColor = GoldStar, contentColor = Color.Black)
-                ) {
-                    Text(
-                        text = if (amt <= 0) "Ingresa cantidad" else if (amt > parentBalance) "Saldo insuficiente" else "Ceder +$amt 🪙 Escolaris 🚀",
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showTransferPointsDialog = false }) {
                     Text("Cancelar")
                 }
             }

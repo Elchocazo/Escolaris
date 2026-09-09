@@ -42,7 +42,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         PenaltyEntity::class,
         ParentObligationEntity::class
     ],
-    version = 10,
+    version = 11,
     exportSchema = false
 )
 abstract class EscolarisDatabase : RoomDatabase() {
@@ -52,11 +52,32 @@ abstract class EscolarisDatabase : RoomDatabase() {
         @Volatile
         private var INSTANCE: EscolarisDatabase? = null
 
+        val MIGRATION_10_11 = object : Migration(10, 11) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                try {
+                    db.execSQL("ALTER TABLE tasks ADD COLUMN firestoreId TEXT NOT NULL DEFAULT ''")
+                } catch (e: Exception) {}
+                try {
+                    db.execSQL("ALTER TABLE tasks ADD COLUMN dueDate TEXT NOT NULL DEFAULT ''")
+                } catch (e: Exception) {}
+                try {
+                    db.execSQL("ALTER TABLE tasks ADD COLUMN completed INTEGER NOT NULL DEFAULT 0")
+                } catch (e: Exception) {}
+                try {
+                    db.execSQL("ALTER TABLE tardy_records ADD COLUMN firestoreId TEXT NOT NULL DEFAULT ''")
+                } catch (e: Exception) {}
+            }
+        }
+
         // Migraciones seguras para proteger datos en cualquier actualización de versión
-        private val SAFE_MIGRATIONS: Array<Migration> = Array(15) { i ->
-            object : Migration(i + 1, i + 2) {
-                override fun migrate(db: SupportSQLiteDatabase) {
-                    // Migración no destructiva: preserva íntegramente las tablas y datos de usuarios y publicaciones
+        private val SAFE_MIGRATIONS: Array<Migration> = Array(20) { i ->
+            if (i + 1 == 10) {
+                MIGRATION_10_11
+            } else {
+                object : Migration(i + 1, i + 2) {
+                    override fun migrate(db: SupportSQLiteDatabase) {
+                        // Migración no destructiva
+                    }
                 }
             }
         }

@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -59,10 +60,12 @@ import com.example.ui.components.NotificationsDialog
 import com.example.ui.components.TopHeaderBar
 import com.example.ui.navigation.Screen
 import com.example.ui.screens.AuthFlowScreen
+import com.example.ui.screens.CourseScreen
 import com.example.ui.screens.ExamScannerHistoryScreen
 import com.example.ui.screens.FeedScreen
 import com.example.ui.screens.GamificationLeaderboardScreen
 import com.example.ui.screens.HomeworkExamsScreen
+import com.example.ui.screens.ParentChildScreen
 import com.example.ui.screens.ParentDashboardScreen
 import com.example.ui.screens.ProfileSettingsScreen
 import com.example.ui.screens.RewardsCatalogScreen
@@ -76,8 +79,8 @@ class MainActivity : ComponentActivity() {
     private val viewModel: SchoolViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        super.onCreate(savedInstanceState)
         setContent {
             val themeMode by viewModel.themeMode.collectAsState()
             val colorTheme by viewModel.colorTheme.collectAsState()
@@ -99,6 +102,7 @@ class MainActivity : ComponentActivity() {
             ) {
                 Scaffold(
                     snackbarHost = { SnackbarHost(snackbarHostState) },
+                    contentWindowInsets = WindowInsets(0, 0, 0, 0),
                     containerColor = MaterialTheme.colorScheme.background
                 ) { innerPadding ->
                     Box(
@@ -150,22 +154,22 @@ fun EscolarisApp(viewModel: SchoolViewModel) {
                 Screen.Feed,
                 Screen.TeacherAdmin,
                 Screen.Profile,
-                Screen.Tasks,
-                Screen.Schedule
+                Screen.Course,
+                Screen.Gamification
             )
             currentRole.equals(UserRole.PARENT.code, ignoreCase = true) -> listOf(
                 Screen.Feed,
                 Screen.ParentDashboard,
                 Screen.Profile,
-                Screen.Tasks,
-                Screen.Schedule
+                Screen.ParentChild,
+                Screen.Course
             )
             else -> listOf(
                 Screen.Feed,
-                Screen.Schedule,
+                Screen.Course,
                 Screen.Profile,
-                Screen.Tasks,
-                Screen.Gamification
+                Screen.Gamification,
+                Screen.Rewards
             )
         }
     }
@@ -325,12 +329,14 @@ fun EscolarisApp(viewModel: SchoolViewModel) {
                     ) { screen ->
                         when (screen) {
                             is Screen.Feed -> FeedScreen(viewModel = viewModel)
-                            is Screen.Tasks -> HomeworkExamsScreen(viewModel = viewModel)
-                            is Screen.Schedule -> ScheduleScreen(viewModel = viewModel)
+                            is Screen.Course -> CourseScreen(viewModel = viewModel)
+                            is Screen.Tasks -> CourseScreen(viewModel = viewModel, initialTab = 2)
+                            is Screen.Schedule -> CourseScreen(viewModel = viewModel, initialTab = 0)
                             is Screen.Scanner -> ExamScannerHistoryScreen(viewModel = viewModel)
                             is Screen.Gamification -> GamificationLeaderboardScreen(viewModel = viewModel)
                             is Screen.Rewards -> RewardsCatalogScreen(viewModel = viewModel)
                             is Screen.ParentDashboard -> ParentDashboardScreen(viewModel = viewModel)
+                            is Screen.ParentChild -> ParentChildScreen(viewModel = viewModel)
                             is Screen.TeacherAdmin -> TeacherAdminDashboardScreen(viewModel = viewModel)
                             is Screen.Profile -> ProfileSettingsScreen(viewModel = viewModel)
                         }

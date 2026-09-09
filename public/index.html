@@ -15,14 +15,24 @@
   <link rel="icon" type="image/png" href="/logo.png">
 
   <!-- Stylesheet -->
-  <link rel="stylesheet" href="/styles.css?v=4.5">
+  <link rel="stylesheet" href="/styles.css?v=5.0">
 
   <!-- Firebase App & Services -->
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-messaging-compat.js"></script>
   <script src="/__/firebase/init.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script>
+    (function() {
+      try {
+        if (localStorage.getItem('escolaris_cached_user')) {
+          document.documentElement.classList.add('auth-restoring');
+        }
+      } catch(e) {}
+    })();
+  </script>
 </head>
 <body>
 
@@ -270,7 +280,12 @@
               </div>
             </div>
 
-
+            <!-- Feed Category Filters -->
+            <div class="feed-filter-bar" style="display:flex; gap:8px; margin-bottom:16px; flex-wrap:wrap;">
+              <button id="btn-feed-filter-todos" class="btn-primary btn-filter active btn-sm" onclick="filterFeed('todos')">Todos</button>
+              <button id="btn-feed-filter-avisos" class="btn-secondary btn-filter btn-sm" onclick="filterFeed('avisos')">📢 Avisos</button>
+              <button id="btn-feed-filter-tareas" class="btn-secondary btn-filter btn-sm" onclick="filterFeed('tareas')">📝 Tareas & Exámenes</button>
+            </div>
 
             <div id="feed-posts-list" class="cards-column">
               <!-- Dynamic posts list -->
@@ -989,9 +1004,10 @@
                 <div id="profile-grade" class="profile-role-grade">🎓 Estudiante • 10° Grado</div>
                 <div id="profile-bio" class="profile-bio">Estudiante activo en Escolaris 🚀</div>
                 
-                <div style="display:flex; gap:6px; margin: 4px 0 6px 0;">
+                <div style="display:flex; gap:6px; margin: 4px 0 6px 0; flex-wrap:wrap;">
                   <button class="btn-primary btn-sm" style="font-size:11px; padding:3px 8px;" onclick="document.getElementById('profile-photo-input').click()">📷 Cambiar Foto</button>
                   <button id="btn-remove-photo" class="btn-secondary btn-sm hidden" style="font-size:11px; padding:3px 8px;" onclick="handleRemoveProfilePhoto()">✕ Quitar Foto</button>
+                  <button id="btn-enable-notifications" class="btn-secondary btn-sm" style="font-size:11px; padding:3px 8px;" onclick="requestNotificationPermission()">🔔 Activar Notificaciones</button>
                 </div>
 
                 <div class="profile-chips-row">
@@ -1637,9 +1653,10 @@
         <div class="form-group">
           <label class="form-label">Categoría</label>
           <select id="post-category" class="form-select">
-            <option value="GENERAL">📢 Comunicado / Aviso General</option>
-            <option value="LATE_HELP">🚨 Auxilio de Apuntes (¿Faltaste a clase?)</option>
+            <option value="AVISOS">📢 Comunicado / Aviso General</option>
+            <option value="TAREAS">📝 Tareas & Exámenes</option>
             <option value="STUDY">📚 Grupo de Estudio</option>
+            <option value="LATE_HELP">🚨 Auxilio de Apuntes (¿Faltaste a clase?)</option>
           </select>
         </div>
         <div class="form-group">
@@ -2393,6 +2410,6 @@
 </div>
 
 <!-- Application Script -->
-<script src="/app.js?v=4.6"></script>
+<script src="/app.js?v=5.1"></script>
 </body>
 </html>

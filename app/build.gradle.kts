@@ -17,8 +17,8 @@ android {
     applicationId = "com.aistudio.escolaris.net"
     minSdk = 24
     targetSdk = 36
-    versionCode = 12
-    versionName = "2.0"
+    versionCode = 14
+    versionName = "2.2"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
@@ -117,6 +117,7 @@ dependencies {
 
   // Firebase Authentication & Google Sign-In via Credential Manager
   implementation(libs.firebase.auth)
+  implementation(libs.firebase.messaging)
   implementation(libs.androidx.credentials)
   implementation(libs.androidx.credentials.play.services)
   implementation(libs.googleid)

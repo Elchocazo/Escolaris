@@ -9,6 +9,7 @@ import androidx.compose.material.icons.filled.FamilyRestroom
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Leaderboard
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.School
 import androidx.compose.material.icons.filled.ShoppingBag
 import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.material.icons.outlined.AdminPanelSettings
@@ -19,8 +20,10 @@ import androidx.compose.material.icons.outlined.FamilyRestroom
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Leaderboard
 import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material.icons.outlined.School
 import androidx.compose.material.icons.outlined.ShoppingBag
-import androidx.compose.material.icons.outlined.TrendingUp
+import androidx.compose.material.icons.filled.EscalatorWarning
+import androidx.compose.material.icons.outlined.EscalatorWarning
 import androidx.compose.ui.graphics.vector.ImageVector
 
 sealed class Screen(
@@ -30,6 +33,7 @@ sealed class Screen(
     val unselectedIcon: ImageVector
 ) {
     object Feed : Screen("feed", "Inicio", Icons.Filled.Home, Icons.Outlined.Home)
+    object Course : Screen("course", "Curso", Icons.Filled.School, Icons.Outlined.School)
     object Tasks : Screen("tasks", "Tareas", Icons.Filled.Assignment, Icons.Outlined.Assignment)
     val Homework = Tasks
     object Profile : Screen("profile", "Perfil", Icons.Filled.Person, Icons.Outlined.Person)
@@ -39,14 +43,15 @@ sealed class Screen(
     object Rewards : Screen("rewards", "Tienda", Icons.Filled.ShoppingBag, Icons.Outlined.ShoppingBag)
     object Gamification : Screen("gamification", "Ranking", Icons.Filled.Leaderboard, Icons.Outlined.Leaderboard)
     object ParentDashboard : Screen("parent", "Padres", Icons.Filled.FamilyRestroom, Icons.Outlined.FamilyRestroom)
+    object ParentChild : Screen("parent_child_screen", "Mi Hijo", Icons.Filled.EscalatorWarning, Icons.Outlined.EscalatorWarning)
     object TeacherAdmin : Screen("teacher_admin", "Admin", Icons.Filled.AdminPanelSettings, Icons.Outlined.AdminPanelSettings)
 
     companion object {
         fun getNavItemsForRole(role: String?): List<Screen> {
             return when (role) {
-                "TEACHER" -> listOf(Feed, TeacherAdmin, Profile, Tasks, Rewards)
-                "PARENT" -> listOf(Feed, ParentDashboard, Profile, Tasks, Schedule)
-                else -> listOf(Feed, Scanner, Profile, Tasks, Gamification)
+                "TEACHER" -> listOf(Feed, TeacherAdmin, Profile, Course, Gamification)
+                "PARENT" -> listOf(Feed, ParentDashboard, Profile, ParentChild, Course)
+                else -> listOf(Feed, Course, Profile, Gamification, Rewards)
             }
         }
     }

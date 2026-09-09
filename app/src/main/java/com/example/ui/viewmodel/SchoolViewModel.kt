@@ -2,6 +2,7 @@ package com.example.ui.viewmodel
 
 import android.app.Application
 import android.content.Context
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.auth.AuthService
@@ -34,6 +35,8 @@ import com.example.domain.validation.ValidationUtils
 import com.example.ui.theme.AppColorTheme
 import com.example.ui.theme.DarkThemeMode
 import com.example.utils.NotificationHelper
+import com.example.service.EscolarisFirebaseMessagingService
+import com.google.firebase.messaging.FirebaseMessaging
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
 import kotlinx.coroutines.Dispatchers
@@ -233,9 +236,21 @@ class SchoolViewModel @JvmOverloads constructor(
                             repository.insertComments(commentsToInsert)
                         }
                     }
-                    val backedUpBadges = EscolarisBackupManager.restoreBadgesBackup(application)
-                    if (backedUpBadges.isNotEmpty()) {
-                        EscolarisDatabase.getDatabase(application).schoolDao().insertBadges(backedUpBadges)
+                    val isBadgesV1Initialized = sessionPrefs.getBoolean("BADGES_V1_INITIALIZED_2026", false)
+                    if (!isBadgesV1Initialized) {
+                        EscolarisBackupManager.clearBadgesBackup(application)
+                        repository.clearAllBadges()
+                        try {
+                            resetBadgesInCloudFirestore()
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                        }
+                        sessionPrefs.edit().putBoolean("BADGES_V1_INITIALIZED_2026", true).apply()
+                    } else {
+                        val backedUpBadges = EscolarisBackupManager.restoreBadgesBackup(application)
+                        if (backedUpBadges.isNotEmpty()) {
+                            EscolarisDatabase.getDatabase(application).schoolDao().insertBadges(backedUpBadges)
+                        }
                     }
                     val backedUpObligations = EscolarisBackupManager.restoreParentObligationsBackup(application)
                     if (backedUpObligations.isNotEmpty()) {
@@ -364,6 +379,8 @@ class SchoolViewModel @JvmOverloads constructor(
             .putInt(PREF_SAVED_XP, user.xp)
             .putInt(PREF_SAVED_PARENT_INCENTIVE, user.parentIncentiveCredits)
             .apply()
+
+        registerFcmTokenForUser(user.id)
     }
 
     // ==========================================
@@ -565,17 +582,20 @@ class SchoolViewModel @JvmOverloads constructor(
                     "title" to title,
                     "content" to content,
                     "postType" to PostType.LATE_HELP_REQUEST.code,
+                    "category" to PostType.LATE_HELP_REQUEST.code,
                     "subject" to subjectClean,
                     "attachmentsJson" to "Solicitud de fotos y apuntes",
                     "resolvedStatus" to false,
                     "timestamp" to post.timestamp,
                     "timestampMillis" to post.timestamp,
                     "likesCount" to 0,
-                    "commentsCount" to 0
+                    "likes" to 0L,
+                    "commentsCount" to 0,
+                    "createdAt" to com.google.firebase.firestore.FieldValue.serverTimestamp()
                 )
-                store.collection("feed_posts").document(postId.toString()).set(postDoc, SetOptions.merge())
+                store.collection("feed_posts").document(postId.toString()).set(postDoc, SetOptions.merge()).await()
             } catch (e: Exception) {
-                e.printStackTrace()
+                Log.e("FIRESTORE_SYNC", "Error subiendo solicitud de apuntes a Firestore", e)
             }
 
             NotificationHelper.showPushNotification(
@@ -657,6 +677,7 @@ class SchoolViewModel @JvmOverloads constructor(
             val properAuthorName = ValidationUtils.formatProperNoun(user.name)
             val postId = System.currentTimeMillis() + (100..999).random()
 
+            val effectivePostType = if (postType.isBlank()) PostType.ANNOUNCEMENT.code else postType.trim()
             val post = FeedPostEntity(
                 id = postId,
                 authorId = user.id,
@@ -665,7 +686,7 @@ class SchoolViewModel @JvmOverloads constructor(
                 authorAvatarColorHex = user.avatarColorHex,
                 title = cleanTitle,
                 content = cleanContent,
-                postType = postType,
+                postType = effectivePostType,
                 subject = subject.trim(),
                 timestamp = System.currentTimeMillis()
             )
@@ -696,6 +717,7 @@ class SchoolViewModel @JvmOverloads constructor(
             )
 
             // 3. Sincronización permanente estilo Red Social en Cloud Firestore
+            var cloudSyncSuccess = true
             try {
                 val store = FirebaseFirestore.getInstance()
                 val notifDoc = hashMapOf(
@@ -708,7 +730,7 @@ class SchoolViewModel @JvmOverloads constructor(
                     "timestampMillis" to System.currentTimeMillis(),
                     "createdAt" to com.google.firebase.firestore.FieldValue.serverTimestamp()
                 )
-                store.collection("notifications").add(notifDoc)
+                store.collection("notifications").add(notifDoc).await()
 
                 val postDoc = hashMapOf(
                     "id" to postId,
@@ -718,34 +740,82 @@ class SchoolViewModel @JvmOverloads constructor(
                     "authorAvatarColorHex" to user.avatarColorHex,
                     "title" to cleanTitle,
                     "content" to cleanContent,
-                    "postType" to postType,
+                    "postType" to effectivePostType,
+                    "category" to effectivePostType,
                     "subject" to subject.trim(),
                     "timestamp" to post.timestamp,
                     "timestampMillis" to post.timestamp,
                     "likesCount" to 0,
+                    "likes" to 0L,
                     "commentsCount" to 0,
                     "resolvedStatus" to false,
-                    "attachmentsJson" to ""
+                    "attachmentsJson" to "",
+                    "createdAt" to com.google.firebase.firestore.FieldValue.serverTimestamp()
                 )
-                store.collection("feed_posts").document(postId.toString()).set(postDoc, SetOptions.merge())
+                store.collection("feed_posts").document(postId.toString()).set(postDoc, SetOptions.merge()).await()
             } catch (e: Exception) {
-                e.printStackTrace()
+                cloudSyncSuccess = false
+                Log.e("FIRESTORE_SYNC", "Error subiendo post a Firestore", e)
+                _userMessage.value = "⚠️ Guardado localmente, pero falló al sincronizar en la nube: ${e.localizedMessage ?: "Verifica sesión de Firebase"}"
             }
 
-            _userMessage.value = "📢 Publicación compartida y notificada a todos los usuarios"
+            if (cloudSyncSuccess) {
+                _userMessage.value = "📢 Publicación compartida y notificada a todos los usuarios"
+            }
         }
     }
 
     fun deletePost(postId: Long) {
         viewModelScope.launch {
+            // 1. Eliminación local en Room (publicación y comentarios asociados)
             repository.deletePost(postId)
+            // 2. Eliminación en respaldo local persistente
+            EscolarisBackupManager.deletePostFromBackup(getApplication(), postId)
+            EscolarisBackupManager.deleteCommentsForPostFromBackup(getApplication(), postId)
+
+            // 3. Eliminación atómica en Cloud Firestore con await
             try {
                 val store = FirebaseFirestore.getInstance()
-                store.collection("feed_posts").document(postId.toString()).delete()
+                store.collection("feed_posts").document(postId.toString()).delete().await()
+
+                // Eliminar todos los comentarios asociados a esta publicación en Firestore
+                val commentsSnap = store.collection("post_comments")
+                    .whereEqualTo("postId", postId)
+                    .get()
+                    .await()
+                if (!commentsSnap.isEmpty) {
+                    val batch = store.batch()
+                    for (doc in commentsSnap.documents) {
+                        batch.delete(doc.reference)
+                    }
+                    batch.commit().await()
+                }
             } catch (e: Exception) {
                 e.printStackTrace()
             }
             _userMessage.value = "Publicación eliminada del muro"
+        }
+    }
+
+    fun deleteComment(commentId: Long, postId: Long) {
+        viewModelScope.launch {
+            // 1. Eliminación local en Room y decremento del contador
+            repository.deleteComment(commentId)
+            repository.decrementCommentCount(postId)
+            // 2. Eliminación en respaldo local persistente
+            EscolarisBackupManager.deleteCommentFromBackup(getApplication(), commentId)
+
+            // 3. Eliminación en Cloud Firestore con await y decremento en feed_posts
+            try {
+                val store = FirebaseFirestore.getInstance()
+                store.collection("post_comments").document(commentId.toString()).delete().await()
+                store.collection("feed_posts").document(postId.toString()).update(
+                    "commentsCount", com.google.firebase.firestore.FieldValue.increment(-1)
+                ).await()
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+            _userMessage.value = "Comentario eliminado"
         }
     }
 
@@ -1678,7 +1748,7 @@ class SchoolViewModel @JvmOverloads constructor(
                 store.collection("users").document(userId).update(
                     "credits", newCredits,
                     "xp", newXp
-                )
+                ).await()
             } catch (e: Exception) {
                 e.printStackTrace()
             }
@@ -1953,6 +2023,41 @@ class SchoolViewModel @JvmOverloads constructor(
         }
     }
 
+    /**
+     * Inicializa o resetea en 0 el catálogo de insignias para todos los usuarios existentes en Cloud Firestore.
+     * Seguridad: Únicamente modifica el campo "badges" con SetOptions.merge(), preservando todos los demás datos intactos.
+     */
+    private suspend fun resetBadgesInCloudFirestore() = withContext(Dispatchers.IO) {
+        try {
+            val store = FirebaseFirestore.getInstance()
+            val usersSnapshot = store.collection("users").get().await()
+            for (doc in usersSnapshot.documents) {
+                val role = doc.getString("role") ?: UserRole.STUDENT.code
+                val initialBadges = com.example.ui.screens.getInitialBadgesForRole(role).map {
+                    mapOf(
+                        "id" to it.id,
+                        "title" to it.title,
+                        "description" to it.description,
+                        "category" to it.category,
+                        "currentProgress" to 0,
+                        "targetProgress" to it.targetProgress,
+                        "emoji" to it.emoji,
+                        "isUnlocked" to false,
+                        "unlockedAtDate" to null,
+                        "xpReward" to it.xpReward,
+                        "creditReward" to it.creditReward
+                    )
+                }
+                store.collection("users").document(doc.id).set(
+                    mapOf("badges" to initialBadges),
+                    SetOptions.merge()
+                ).await()
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
     private suspend fun syncCloudFirestoreData() = withContext(Dispatchers.IO) {
         try {
             val store = FirebaseFirestore.getInstance()
@@ -1984,19 +2089,14 @@ class SchoolViewModel @JvmOverloads constructor(
                 val parentIncentiveCredits = (doc.getLong("parentIncentiveCredits") ?: 100L).toInt()
                 val linkedStudentId = doc.getString("linkedStudentId")
 
-                val localUser = repository.getUserDirect(id)
-                val finalCredits = if (localUser != null) maxOf(localUser.credits, credits) else credits
-                val finalXp = if (localUser != null) maxOf(localUser.xp, xp) else xp
-                val finalParentIncentive = if (localUser != null) maxOf(localUser.parentIncentiveCredits, parentIncentiveCredits) else parentIncentiveCredits
-
                 val user = UserEntity(
                     id = id,
                     name = name,
                     email = email,
                     role = role,
                     gradeSection = gradeSection,
-                    credits = if (isTeacher) maxOf(finalCredits, 500) else finalCredits,
-                    xp = if (isTeacher) maxOf(finalXp, 200) else finalXp,
+                    credits = if (isTeacher) maxOf(credits, 500) else credits,
+                    xp = if (isTeacher) maxOf(xp, 200) else xp,
                     studentCode = studentCode,
                     teacherCode = teacherCode,
                     avatarEmoji = avatarEmoji,
@@ -2004,23 +2104,13 @@ class SchoolViewModel @JvmOverloads constructor(
                     bio = bio,
                     photoUri = photoUri,
                     phoneNumber = phoneNumber,
-                    parentIncentiveCredits = finalParentIncentive,
+                    parentIncentiveCredits = parentIncentiveCredits,
                     linkedStudentId = linkedStudentId
                 )
                 repository.insertUser(user)
-
-                // Si los puntos locales eran mayores a los de la nube, actualizar la nube
-                if (localUser != null && (localUser.credits > credits || localUser.xp > xp || localUser.parentIncentiveCredits > parentIncentiveCredits)) {
-                    try {
-                        store.collection("users").document(id).update(
-                            "credits", user.credits,
-                            "xp", user.xp,
-                            "parentIncentiveCredits", user.parentIncentiveCredits
-                        )
-                    } catch (e: Exception) {
-                        e.printStackTrace()
-                    }
-                }
+            }
+            if (existingIdsInFirestore.isNotEmpty()) {
+                repository.pruneUsers(existingIdsInFirestore.toList())
             }
 
             // 1.1 Sincronizar hacia Cloud Firestore los perfiles institucionales si no existen en la nube
@@ -2049,6 +2139,21 @@ class SchoolViewModel @JvmOverloads constructor(
                             "bio" to institutionalUser.bio,
                             "phoneNumber" to institutionalUser.phoneNumber,
                             "roleConfigured" to true,
+                            "badges" to com.example.ui.screens.getInitialBadgesForRole(institutionalUser.role).map {
+                                mapOf(
+                                    "id" to it.id,
+                                    "title" to it.title,
+                                    "description" to it.description,
+                                    "category" to it.category,
+                                    "currentProgress" to 0,
+                                    "targetProgress" to it.targetProgress,
+                                    "emoji" to it.emoji,
+                                    "isUnlocked" to false,
+                                    "unlockedAtDate" to null,
+                                    "xpReward" to it.xpReward,
+                                    "creditReward" to it.creditReward
+                                )
+                            },
                             "createdAt" to System.currentTimeMillis()
                         )
                         store.collection("users").document(institutionalUser.id).set(firestoreData, SetOptions.merge()).await()
@@ -2151,7 +2256,7 @@ class SchoolViewModel @JvmOverloads constructor(
                 val obligationsSnapshot = store.collection("parent_obligations").get().await()
                 val existingObligations = repository.getAllParentObligationsDirect()
                 for (doc in obligationsSnapshot.documents) {
-                    val oId = doc.getLong("id") ?: doc.id.toLongOrNull() ?: continue
+                    val oId = doc.getLong("id") ?: doc.id.toLongOrNull() ?: kotlin.math.abs(doc.id.hashCode().toLong())
                     val parentId = doc.getString("parentId") ?: "ALL"
                     val studentId = doc.getString("studentId") ?: "ALL"
                     val title = doc.getString("title") ?: "Obligación Escolar"
@@ -2200,7 +2305,7 @@ class SchoolViewModel @JvmOverloads constructor(
                 if (liveObligations.isNotEmpty()) {
                     EscolarisBackupManager.saveParentObligationsBackup(getApplication(), liveObligations)
                     for (lo in liveObligations) {
-                        val inCloud = obligationsSnapshot.documents.any { (it.getLong("id") ?: it.id.toLongOrNull()) == lo.id }
+                        val inCloud = obligationsSnapshot.documents.any { (it.getLong("id") ?: it.id.toLongOrNull() ?: kotlin.math.abs(it.id.hashCode().toLong())) == lo.id }
                         if (!inCloud) {
                             try {
                                 val oblMap = hashMapOf(
@@ -2240,17 +2345,19 @@ class SchoolViewModel @JvmOverloads constructor(
                 val postsSnapshot = store.collection("feed_posts").get().await()
                 val incomingPosts = mutableListOf<FeedPostEntity>()
                 for (doc in postsSnapshot.documents) {
-                    val pId = doc.getLong("id") ?: doc.id.toLongOrNull() ?: (doc.getLong("timestamp") ?: System.currentTimeMillis())
+                    val pId = doc.getLong("id")
+                        ?: doc.id.toLongOrNull()
+                        ?: kotlin.math.abs(doc.id.hashCode().toLong())
                     val authorId = doc.getString("authorId") ?: ""
                     val authorName = ValidationUtils.formatProperNoun(doc.getString("authorName") ?: "Docente")
                     val authorRole = doc.getString("authorRole") ?: "TEACHER"
                     val authorAvatarColorHex = doc.getLong("authorAvatarColorHex") ?: 0xFF2563EB
                     val title = doc.getString("title") ?: ""
                     val content = doc.getString("content") ?: ""
-                    val postType = doc.getString("postType") ?: "ANNOUNCEMENT"
+                    val postType = doc.getString("postType") ?: doc.getString("category") ?: "ANNOUNCEMENT"
                     val subject = doc.getString("subject") ?: "General"
-                    val ts = doc.getLong("timestamp") ?: (doc.getLong("timestampMillis") ?: System.currentTimeMillis())
-                    val likesCount = (doc.getLong("likesCount") ?: 0L).toInt()
+                    val ts = doc.getLong("timestamp") ?: doc.getLong("timestampMillis") ?: System.currentTimeMillis()
+                    val likesCount = ((doc.getLong("likesCount") ?: doc.getLong("likes")) ?: 0L).toInt()
                     val isLikedByMe = doc.getBoolean("isLikedByMe") ?: false
                     val attachmentsJson = doc.getString("attachmentsJson") ?: ""
                     val commentsCount = (doc.getLong("commentsCount") ?: 0L).toInt()
@@ -2276,40 +2383,13 @@ class SchoolViewModel @JvmOverloads constructor(
                         )
                     )
                 }
+                val cloudIds = incomingPosts.map { it.id }
+                repository.pruneFeedPosts(cloudIds)
                 if (incomingPosts.isNotEmpty()) {
                     repository.insertFeedPosts(incomingPosts)
+                    EscolarisBackupManager.saveFeedPostsBackup(getApplication(), incomingPosts)
                 }
-                val allLivePosts = repository.getAllFeedPostsDirect()
-                if (allLivePosts.isNotEmpty()) {
-                    EscolarisBackupManager.saveFeedPostsBackup(getApplication(), allLivePosts)
-                    for (lp in allLivePosts) {
-                        val inCloud = postsSnapshot.documents.any { (it.getLong("id") ?: it.id.toLongOrNull()) == lp.id }
-                        if (!inCloud) {
-                            try {
-                                val pMap = hashMapOf(
-                                    "id" to lp.id,
-                                    "authorId" to lp.authorId,
-                                    "authorName" to lp.authorName,
-                                    "authorRole" to lp.authorRole,
-                                    "authorAvatarColorHex" to lp.authorAvatarColorHex,
-                                    "title" to lp.title,
-                                    "content" to lp.content,
-                                    "postType" to lp.postType,
-                                    "subject" to lp.subject,
-                                    "timestamp" to lp.timestamp,
-                                    "timestampMillis" to lp.timestamp,
-                                    "likesCount" to lp.likesCount,
-                                    "commentsCount" to lp.commentsCount,
-                                    "resolvedStatus" to lp.resolvedStatus,
-                                    "attachmentsJson" to lp.attachmentsJson
-                                )
-                                store.collection("feed_posts").document(lp.id.toString()).set(pMap, SetOptions.merge())
-                            } catch (e: Exception) {
-                                e.printStackTrace()
-                            }
-                        }
-                    }
-                }
+                EscolarisBackupManager.pruneFeedPostsBackup(getApplication(), cloudIds.toSet())
             } catch (e: Exception) {
                 e.printStackTrace()
             }
@@ -2341,9 +2421,103 @@ class SchoolViewModel @JvmOverloads constructor(
                         )
                     )
                 }
+                val cloudCommentIds = incomingComments.map { it.id }
+                repository.pruneComments(cloudCommentIds)
                 if (incomingComments.isNotEmpty()) {
                     repository.insertComments(incomingComments)
                     EscolarisBackupManager.savePostCommentsBackup(getApplication(), incomingComments)
+                }
+                EscolarisBackupManager.prunePostCommentsBackup(getApplication(), cloudCommentIds.toSet())
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+
+            // 6. Sincronizar Tareas (tasks) iniciales
+            try {
+                val tasksSnapshot = store.collection("tasks").get().await()
+                val existingTasks = repository.getAllTasksDirect()
+                for (doc in tasksSnapshot.documents) {
+                    val fId = doc.id
+                    val title = doc.getString("title") ?: ""
+                    if (title.isBlank()) continue
+                    val subject = doc.getString("subject") ?: "General"
+                    val desc = doc.getString("description") ?: ""
+                    val dueDateStr = doc.getString("dueDate") ?: ""
+                    val dueMillis = doc.getLong("dueDateMillis") ?: (doc.getLong("timestampMillis") ?: System.currentTimeMillis())
+                    val priority = doc.getString("priority") ?: "MEDIA"
+                    val isCompleted = doc.getBoolean("completed") ?: (doc.getString("status") == "COMPLETED")
+                    val status = if (isCompleted) "COMPLETED" else (doc.getString("status") ?: "PENDING")
+                    val studentId = doc.getString("studentId") ?: "ALL"
+                    val rewardCredits = (doc.getLong("rewardCredits") ?: 30L).toInt()
+
+                    val localMatch = existingTasks.find { it.firestoreId == fId || (it.title == title && it.dueDateMillis == dueMillis) }
+                    if (localMatch != null) {
+                        if (localMatch.status != status || localMatch.completed != isCompleted || localMatch.firestoreId != fId) {
+                            repository.updateTask(localMatch.copy(firestoreId = fId, status = status, completed = isCompleted, title = title, subject = subject, description = desc, dueDate = dueDateStr, dueDateMillis = dueMillis, priority = priority))
+                        }
+                    } else {
+                        val newTask = TaskEntity(
+                            firestoreId = fId,
+                            studentId = studentId,
+                            title = title,
+                            subject = subject,
+                            description = desc,
+                            dueDateMillis = dueMillis,
+                            dueDate = dueDateStr,
+                            priority = priority,
+                            status = status,
+                            completed = isCompleted,
+                            rewardCredits = rewardCredits
+                        )
+                        repository.insertTask(newTask)
+                    }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+
+            // 7. Sincronizar Retardos (tardies) iniciales
+            try {
+                val tardiesSnapshot = store.collection("tardies").get().await()
+                val existingTardies = repository.getAllTardyRecordsDirect()
+                for (doc in tardiesSnapshot.documents) {
+                    val fId = doc.id
+                    val sId = doc.getString("studentId") ?: continue
+                    val sName = doc.getString("studentName") ?: "Estudiante"
+                    val subj = doc.getString("subject") ?: "Clase General"
+                    val delay = (doc.getLong("delayMinutes") ?: 15L).toInt()
+                    val reason = doc.getString("reason") ?: "Retardo"
+                    val arrTime = doc.getString("arrivalTime") ?: "07:45 AM"
+                    val gradeSec = doc.getString("gradeSection") ?: "10° Grado"
+                    val status = doc.getString("status") ?: "REGISTRADO"
+                    val dateMillis = doc.getLong("dateMillis") ?: System.currentTimeMillis()
+                    val notified = doc.getBoolean("notifiedParents") ?: true
+                    val obs = doc.getString("teacherObservation") ?: ""
+                    val penalty = (doc.getLong("penaltyCredits") ?: 0L).toInt()
+
+                    val localMatch = existingTardies.find { it.firestoreId == fId }
+                    if (localMatch != null) {
+                        if (localMatch.status != status || localMatch.teacherObservation != obs) {
+                            repository.updateTardyRecordStatus(localMatch.id, status, obs)
+                        }
+                    } else {
+                        val newRecord = TardyRecordEntity(
+                            firestoreId = fId,
+                            studentId = sId,
+                            studentName = sName,
+                            gradeSection = gradeSec,
+                            dateMillis = dateMillis,
+                            arrivalTime = arrTime,
+                            delayMinutes = delay,
+                            subject = subj,
+                            reason = reason,
+                            status = status,
+                            notifiedParents = notified,
+                            teacherObservation = obs,
+                            penaltyCredits = penalty
+                        )
+                        repository.insertTardyRecord(newRecord)
+                    }
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
@@ -2356,22 +2530,104 @@ class SchoolViewModel @JvmOverloads constructor(
     private fun startRealtimeSocialSync() {
         try {
             val store = FirebaseFirestore.getInstance()
+
+            // 1. Sincronización en tiempo real para Usuarios (users) - FUENTE ÚNICA DE VERDAD (SSOT)
+            store.collection("users").addSnapshotListener { snapshot, error ->
+                if (error != null || snapshot == null) return@addSnapshotListener
+                viewModelScope.launch(Dispatchers.IO) {
+                    try {
+                        val incomingUsers = mutableListOf<UserEntity>()
+                        for (doc in snapshot.documents) {
+                            val id = doc.id
+                            val email = doc.getString("email")?.trim()?.lowercase() ?: ""
+                            val isTeacher = email == "moz658@gmail.com"
+                            val rawName = doc.getString("name") ?: (if (isTeacher) "Manuel Muñoz" else "Usuario")
+                            val name = ValidationUtils.formatProperNoun(if (isTeacher && (rawName == "Usuario" || rawName == "Docente Titular" || rawName.isBlank())) "Manuel Muñoz" else rawName)
+                            val role = if (isTeacher) UserRole.TEACHER.code else (doc.getString("role") ?: UserRole.STUDENT.code)
+                            val credits = (doc.getLong("credits") ?: (doc.getDouble("credits")?.toLong() ?: 100L)).toInt()
+                            val xp = (doc.getLong("xp") ?: (doc.getDouble("xp")?.toLong() ?: 50L)).toInt()
+                            val level = (doc.getLong("level") ?: (doc.getDouble("level")?.toLong() ?: 1L)).toInt()
+                            val streakDays = (doc.getLong("streakDays") ?: (doc.getDouble("streakDays")?.toLong() ?: 1L)).toInt()
+                            val studentCode = if (isTeacher) "" else (doc.getString("studentCode") ?: "")
+                            val teacherCode = if (isTeacher) "DOC-102938" else (doc.getString("teacherCode") ?: "")
+                            val avatarEmoji = doc.getString("avatarEmoji") ?: (if (isTeacher) "👨‍🏫" else "🎓")
+                            val gradeSection = doc.getString("gradeSection") ?: (if (isTeacher) "Docente Titular" else "10° Grado")
+                            val bio = doc.getString("bio") ?: ""
+                            val photoUri = doc.getString("photoUrl") ?: doc.getString("photoUri")
+                            val phoneNumber = doc.getString("phoneNumber") ?: ""
+                            val avatarColorHex = doc.getLong("avatarColorHex") ?: (if (isTeacher) 0xFF1D4ED8 else 0xFF2563EB)
+                            val parentIncentiveCredits = (doc.getLong("parentIncentiveCredits") ?: (doc.getDouble("parentIncentiveCredits")?.toLong() ?: 100L)).toInt()
+                            val linkedStudentId = doc.getString("linkedStudentId")
+                            val linkedTeacherCode = doc.getString("linkedTeacherCode")
+                            val bannerGradientIndex = (doc.getLong("bannerGradientIndex") ?: 0L).toInt()
+
+                            incomingUsers.add(
+                                UserEntity(
+                                    id = id,
+                                    name = name,
+                                    email = email,
+                                    role = role,
+                                    gradeSection = gradeSection,
+                                    credits = if (isTeacher) maxOf(credits, 500) else credits,
+                                    xp = if (isTeacher) maxOf(xp, 200) else xp,
+                                    level = level,
+                                    streakDays = streakDays,
+                                    studentCode = studentCode,
+                                    teacherCode = teacherCode,
+                                    avatarEmoji = avatarEmoji,
+                                    avatarColorHex = avatarColorHex,
+                                    bio = bio,
+                                    photoUri = photoUri,
+                                    phoneNumber = phoneNumber,
+                                    parentIncentiveCredits = parentIncentiveCredits,
+                                    linkedStudentId = linkedStudentId,
+                                    linkedTeacherCode = linkedTeacherCode,
+                                    bannerGradientIndex = bannerGradientIndex
+                                )
+                            )
+                        }
+
+                        val cloudIds = incomingUsers.map { it.id }
+                        repository.pruneUsers(cloudIds)
+                        if (incomingUsers.isNotEmpty()) {
+                            repository.insertUsers(incomingUsers)
+                            EscolarisBackupManager.saveUsersBackup(getApplication(), incomingUsers)
+                        }
+
+                        // Si el usuario en sesión activa cambió en Firestore, actualizar StateFlow inmediatamente
+                        val activeId = _currentUserId.value
+                        val matchedCurrent = incomingUsers.find { it.id == activeId }
+                        if (matchedCurrent != null) {
+                            withContext(Dispatchers.Main) {
+                                _currentUser.value = matchedCurrent
+                                persistSessionUser(matchedCurrent)
+                            }
+                        }
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
+                }
+            }
+
+            // 2. Sincronización en tiempo real de publicaciones del muro social (feed_posts)
             store.collection("feed_posts").addSnapshotListener { snapshot, error ->
                 if (error != null || snapshot == null) return@addSnapshotListener
                 viewModelScope.launch(Dispatchers.IO) {
                     val incomingPosts = mutableListOf<FeedPostEntity>()
                     for (doc in snapshot.documents) {
-                        val pId = doc.getLong("id") ?: doc.id.toLongOrNull() ?: (doc.getLong("timestamp") ?: System.currentTimeMillis())
+                        val pId = doc.getLong("id")
+                            ?: doc.id.toLongOrNull()
+                            ?: kotlin.math.abs(doc.id.hashCode().toLong())
                         val authorId = doc.getString("authorId") ?: ""
                         val authorName = ValidationUtils.formatProperNoun(doc.getString("authorName") ?: "Docente")
                         val authorRole = doc.getString("authorRole") ?: "TEACHER"
                         val authorAvatarColorHex = doc.getLong("authorAvatarColorHex") ?: 0xFF2563EB
                         val title = doc.getString("title") ?: ""
                         val content = doc.getString("content") ?: ""
-                        val postType = doc.getString("postType") ?: "ANNOUNCEMENT"
+                        val postType = doc.getString("postType") ?: doc.getString("category") ?: "ANNOUNCEMENT"
                         val subject = doc.getString("subject") ?: "General"
-                        val ts = doc.getLong("timestamp") ?: (doc.getLong("timestampMillis") ?: System.currentTimeMillis())
-                        val likesCount = (doc.getLong("likesCount") ?: 0L).toInt()
+                        val ts = doc.getLong("timestamp") ?: doc.getLong("timestampMillis") ?: System.currentTimeMillis()
+                        val likesCount = ((doc.getLong("likesCount") ?: doc.getLong("likes")) ?: 0L).toInt()
                         val attachmentsJson = doc.getString("attachmentsJson") ?: ""
                         val commentsCount = (doc.getLong("commentsCount") ?: 0L).toInt()
                         val resolvedStatus = doc.getBoolean("resolvedStatus") ?: false
@@ -2396,13 +2652,17 @@ class SchoolViewModel @JvmOverloads constructor(
                             )
                         )
                     }
+                    val cloudIds = incomingPosts.map { it.id }
+                    repository.pruneFeedPosts(cloudIds)
                     if (incomingPosts.isNotEmpty()) {
                         repository.insertFeedPosts(incomingPosts)
                         EscolarisBackupManager.saveFeedPostsBackup(getApplication(), incomingPosts)
                     }
+                    EscolarisBackupManager.pruneFeedPostsBackup(getApplication(), cloudIds.toSet())
                 }
             }
 
+            // 3. Sincronización en tiempo real de comentarios (post_comments)
             store.collection("post_comments").addSnapshotListener { snapshot, error ->
                 if (error != null || snapshot == null) return@addSnapshotListener
                 viewModelScope.launch(Dispatchers.IO) {
@@ -2430,9 +2690,297 @@ class SchoolViewModel @JvmOverloads constructor(
                             )
                         )
                     }
+                    val cloudCommentIds = incomingComments.map { it.id }
+                    repository.pruneComments(cloudCommentIds)
                     if (incomingComments.isNotEmpty()) {
                         repository.insertComments(incomingComments)
                         EscolarisBackupManager.savePostCommentsBackup(getApplication(), incomingComments)
+                    }
+                    EscolarisBackupManager.prunePostCommentsBackup(getApplication(), cloudCommentIds.toSet())
+                }
+            }
+
+            // 4. Sincronización en tiempo real para Tareas (tasks)
+            store.collection("tasks").addSnapshotListener { snapshot, error ->
+                if (error != null || snapshot == null) return@addSnapshotListener
+                viewModelScope.launch(Dispatchers.IO) {
+                    try {
+                        val cloudTaskIds = snapshot.documents.map { it.id }
+                        repository.pruneTasks(cloudTaskIds)
+                        val existingTasks = repository.getAllTasksDirect()
+                        for (doc in snapshot.documents) {
+                            val fId = doc.id
+                            val title = doc.getString("title") ?: ""
+                            if (title.isBlank()) continue
+                            val subject = doc.getString("subject") ?: "General"
+                            val desc = doc.getString("description") ?: ""
+                            val dueDateStr = doc.getString("dueDate") ?: ""
+                            val dueMillis = doc.getLong("dueDateMillis") ?: (doc.getLong("timestampMillis") ?: System.currentTimeMillis())
+                            val priority = doc.getString("priority") ?: "MEDIA"
+                            val isCompleted = doc.getBoolean("completed") ?: (doc.getString("status") == "COMPLETED")
+                            val status = if (isCompleted) "COMPLETED" else (doc.getString("status") ?: "PENDING")
+                            val studentId = doc.getString("studentId") ?: "ALL"
+                            val rewardCredits = (doc.getLong("rewardCredits") ?: 30L).toInt()
+
+                            val localMatch = existingTasks.find { it.firestoreId == fId || (it.title == title && it.dueDateMillis == dueMillis) }
+                            if (localMatch != null) {
+                                if (localMatch.status != status || localMatch.completed != isCompleted || localMatch.firestoreId != fId) {
+                                    repository.updateTask(localMatch.copy(firestoreId = fId, status = status, completed = isCompleted, title = title, subject = subject, description = desc, dueDate = dueDateStr, dueDateMillis = dueMillis, priority = priority))
+                                }
+                            } else {
+                                val newTask = TaskEntity(
+                                    firestoreId = fId,
+                                    studentId = studentId,
+                                    title = title,
+                                    subject = subject,
+                                    description = desc,
+                                    dueDateMillis = dueMillis,
+                                    dueDate = dueDateStr,
+                                    priority = priority,
+                                    status = status,
+                                    completed = isCompleted,
+                                    rewardCredits = rewardCredits
+                                )
+                                repository.insertTask(newTask)
+                            }
+                        }
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
+                }
+            }
+
+            // 5. Sincronización en tiempo real para Llegadas Tarde / Retardos (tardies)
+            store.collection("tardies").addSnapshotListener { snapshot, error ->
+                if (error != null || snapshot == null) return@addSnapshotListener
+                viewModelScope.launch(Dispatchers.IO) {
+                    try {
+                        val cloudTardyIds = snapshot.documents.map { it.id }
+                        repository.pruneTardies(cloudTardyIds)
+                        val existingTardies = repository.getAllTardyRecordsDirect()
+                        for (doc in snapshot.documents) {
+                            val fId = doc.id
+                            val sId = doc.getString("studentId") ?: continue
+                            val sName = doc.getString("studentName") ?: "Estudiante"
+                            val subj = doc.getString("subject") ?: "Clase General"
+                            val delay = (doc.getLong("delayMinutes") ?: 15L).toInt()
+                            val reason = doc.getString("reason") ?: "Retardo"
+                            val arrTime = doc.getString("arrivalTime") ?: "07:45 AM"
+                            val gradeSec = doc.getString("gradeSection") ?: "10° Grado"
+                            val status = doc.getString("status") ?: "REGISTRADO"
+                            val dateMillis = doc.getLong("dateMillis") ?: System.currentTimeMillis()
+                            val notified = doc.getBoolean("notifiedParents") ?: true
+                            val obs = doc.getString("teacherObservation") ?: ""
+                            val penalty = (doc.getLong("penaltyCredits") ?: 0L).toInt()
+
+                            val localMatch = existingTardies.find { it.firestoreId == fId }
+                            if (localMatch != null) {
+                                if (localMatch.status != status || localMatch.teacherObservation != obs) {
+                                    repository.updateTardyRecordStatus(localMatch.id, status, obs)
+                                }
+                            } else {
+                                val newRecord = TardyRecordEntity(
+                                    firestoreId = fId,
+                                    studentId = sId,
+                                    studentName = sName,
+                                    gradeSection = gradeSec,
+                                    dateMillis = dateMillis,
+                                    arrivalTime = arrTime,
+                                    delayMinutes = delay,
+                                    subject = subj,
+                                    reason = reason,
+                                    status = status,
+                                    notifiedParents = notified,
+                                    teacherObservation = obs,
+                                    penaltyCredits = penalty
+                                )
+                                repository.insertTardyRecord(newRecord)
+                            }
+                        }
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
+                }
+            }
+
+            // 6. Sincronización en tiempo real para Medallas e Insignias (badges)
+            store.collection("badges").addSnapshotListener { snapshot, error ->
+                if (error != null || snapshot == null) return@addSnapshotListener
+                viewModelScope.launch(Dispatchers.IO) {
+                    try {
+                        val incomingBadges = mutableListOf<BadgeEntity>()
+                        val validKeys = mutableListOf<String>()
+                        for (doc in snapshot.documents) {
+                            val sId = doc.getString("studentId") ?: continue
+                            val key = doc.getString("badgeKey") ?: doc.id
+                            validKeys.add("${sId}_${key}")
+                            val title = doc.getString("title") ?: "Insignia de Honor"
+                            val desc = doc.getString("description") ?: ""
+                            val emoji = doc.getString("emoji") ?: "🎖️"
+                            val cat = doc.getString("category") ?: "HONOR"
+                            val note = doc.getString("teacherNote") ?: ""
+                            val xp = (doc.getLong("xpReward") ?: 100L).toInt()
+                            val cred = (doc.getLong("creditReward") ?: 50L).toInt()
+                            val photo = doc.getString("photoUrl")
+                            val unlockedAt = doc.getLong("unlockedAtMillis") ?: System.currentTimeMillis()
+
+                            incomingBadges.add(
+                                BadgeEntity(
+                                    badgeKey = key,
+                                    studentId = sId,
+                                    title = title,
+                                    description = desc,
+                                    emoji = emoji,
+                                    category = cat,
+                                    unlockedAtMillis = unlockedAt,
+                                    teacherNote = note,
+                                    xpReward = xp,
+                                    creditReward = cred,
+                                    photoUri = photo
+                                )
+                            )
+                        }
+                        repository.pruneBadges(validKeys)
+                        if (incomingBadges.isNotEmpty()) {
+                            repository.insertBadges(incomingBadges)
+                            EscolarisBackupManager.saveBadgesBackup(getApplication(), incomingBadges)
+                        }
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
+                }
+            }
+
+            // 7. Sincronización en tiempo real para Multas y Sanciones (penalties)
+            store.collection("penalties").addSnapshotListener { snapshot, error ->
+                if (error != null || snapshot == null) return@addSnapshotListener
+                viewModelScope.launch(Dispatchers.IO) {
+                    try {
+                        val incomingPenalties = mutableListOf<com.example.data.local.entity.PenaltyEntity>()
+                        for (doc in snapshot.documents) {
+                            val sId = doc.getString("studentId") ?: continue
+                            val sName = doc.getString("studentName") ?: "Estudiante"
+                            val reason = doc.getString("reason") ?: "Falta disciplinaria"
+                            val category = doc.getString("category") ?: "DISCIPLINE"
+                            val pts = (doc.getLong("pointsDeducted") ?: 30L).toInt()
+                            val teacher = doc.getString("teacherName") ?: "Docente"
+                            val obs = doc.getString("observation") ?: ""
+                            val ts = doc.getLong("timestamp") ?: System.currentTimeMillis()
+                            val status = doc.getString("status") ?: "APLICADA"
+                            val notified = doc.getBoolean("notifiedParents") ?: true
+
+                            incomingPenalties.add(
+                                com.example.data.local.entity.PenaltyEntity(
+                                    studentId = sId,
+                                    studentName = sName,
+                                    reason = reason,
+                                    category = category,
+                                    pointsDeducted = pts,
+                                    teacherName = teacher,
+                                    observation = obs,
+                                    timestamp = ts,
+                                    status = status,
+                                    notifiedParents = notified
+                                )
+                            )
+                        }
+                        if (incomingPenalties.isNotEmpty()) {
+                            repository.clearAllPenalties()
+                            repository.insertPenalties(incomingPenalties)
+                        }
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
+                }
+            }
+
+            // 8. Sincronización en tiempo real para Obligaciones y Pensiones (parent_obligations)
+            store.collection("parent_obligations").addSnapshotListener { snapshot, error ->
+                if (error != null || snapshot == null) return@addSnapshotListener
+                viewModelScope.launch(Dispatchers.IO) {
+                    try {
+                        val incomingObligations = mutableListOf<ParentObligationEntity>()
+                        val validIds = mutableListOf<Long>()
+                        for (doc in snapshot.documents) {
+                            val oId = doc.getLong("id") ?: doc.id.toLongOrNull() ?: kotlin.math.abs(doc.id.hashCode().toLong())
+                            validIds.add(oId)
+                            val parentId = doc.getString("parentId") ?: "ALL"
+                            val studentId = doc.getString("studentId") ?: "ALL"
+                            val title = doc.getString("title") ?: "Obligación Escolar"
+                            val description = doc.getString("description") ?: ""
+                            val category = doc.getString("category") ?: "PENSION"
+                            val month = doc.getString("month") ?: "Septiembre"
+                            val dueDayOfMonth = (doc.getLong("dueDayOfMonth") ?: 5L).toInt()
+                            val dueDateMillis = doc.getLong("dueDateMillis") ?: System.currentTimeMillis()
+                            val isCompleted = doc.getBoolean("isCompleted") ?: false
+                            val completedAtMillis = doc.getLong("completedAtMillis")
+                            val completedByParentName = doc.getString("completedByParentName") ?: ""
+                            val rewardBadgeKey = doc.getString("rewardBadgeKey") ?: ""
+                            val rewardBadgeTitle = doc.getString("rewardBadgeTitle") ?: ""
+                            val rewardBadgeEmoji = doc.getString("rewardBadgeEmoji") ?: "💳"
+                            val rewardCredits = (doc.getLong("rewardCredits") ?: 100L).toInt()
+                            val rewardXp = (doc.getLong("rewardXp") ?: 150L).toInt()
+                            val whatsappMessage = doc.getString("whatsappMessage") ?: ""
+                            val createdByTeacher = doc.getString("createdByTeacher") ?: "Docente Titular"
+
+                            incomingObligations.add(
+                                ParentObligationEntity(
+                                    id = oId,
+                                    parentId = parentId,
+                                    studentId = studentId,
+                                    title = title,
+                                    description = description,
+                                    category = category,
+                                    month = month,
+                                    dueDayOfMonth = dueDayOfMonth,
+                                    dueDateMillis = dueDateMillis,
+                                    isCompleted = isCompleted,
+                                    completedAtMillis = completedAtMillis,
+                                    completedByParentName = completedByParentName,
+                                    rewardBadgeKey = rewardBadgeKey,
+                                    rewardBadgeTitle = rewardBadgeTitle,
+                                    rewardBadgeEmoji = rewardBadgeEmoji,
+                                    rewardCredits = rewardCredits,
+                                    rewardXp = rewardXp,
+                                    whatsappMessage = whatsappMessage,
+                                    createdByTeacher = createdByTeacher
+                                )
+                            )
+                        }
+                        repository.pruneParentObligations(validIds)
+                        if (incomingObligations.isNotEmpty()) {
+                            repository.insertParentObligations(incomingObligations)
+                            EscolarisBackupManager.saveParentObligationsBackup(getApplication(), incomingObligations)
+                        }
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    private fun registerFcmTokenForUser(userId: String) {
+        if (userId.isBlank()) return
+        try {
+            FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
+                if (task.isSuccessful) {
+                    val token = task.result
+                    if (!token.isNullOrBlank()) {
+                        val store = FirebaseFirestore.getInstance()
+                        val tokenData = hashMapOf(
+                            "token" to token,
+                            "platform" to "android",
+                            "deviceModel" to android.os.Build.MODEL,
+                            "updatedAt" to System.currentTimeMillis()
+                        )
+                        store.collection("users")
+                            .document(userId)
+                            .collection("fcmTokens")
+                            .document(token)
+                            .set(tokenData, SetOptions.merge())
                     }
                 }
             }

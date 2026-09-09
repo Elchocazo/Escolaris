@@ -15,6 +15,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 import java.util.UUID
+import com.example.ui.screens.getInitialBadgesForRole
 
 class AuthService(
     private val schoolDao: SchoolDao
@@ -70,6 +71,28 @@ class AuthService(
         val chars = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ"
         val randomPart = (1..6).map { chars.random() }.joinToString("")
         return "ESC-$randomPart"
+    }
+
+    /**
+     * Serializa la lista oficial de insignias en 0 según el rol para almacenamiento en Firestore.
+     */
+    fun getInitialBadgesFirestoreMap(role: String): List<Map<String, Any?>> {
+        val items = getInitialBadgesForRole(role)
+        return items.map {
+            mapOf(
+                "id" to it.id,
+                "title" to it.title,
+                "description" to it.description,
+                "category" to it.category,
+                "currentProgress" to 0,
+                "targetProgress" to it.targetProgress,
+                "emoji" to it.emoji,
+                "isUnlocked" to false,
+                "unlockedAtDate" to null,
+                "xpReward" to it.xpReward,
+                "creditReward" to it.creditReward
+            )
+        }
     }
 
     /**
@@ -201,6 +224,7 @@ class AuthService(
                     "linkedStudentId" to userEntity.linkedStudentId,
                     "bio" to userEntity.bio,
                     "avatarEmoji" to userEntity.avatarEmoji,
+                    "badges" to getInitialBadgesFirestoreMap(userEntity.role),
                     "createdAt" to System.currentTimeMillis()
                 )
                 store.collection("users").document(userId).set(firestoreData, SetOptions.merge()).await()
@@ -453,6 +477,7 @@ class AuthService(
                     "credits" to newUser.credits,
                     "bio" to newUser.bio,
                     "avatarEmoji" to newUser.avatarEmoji,
+                    "badges" to getInitialBadgesFirestoreMap(newUser.role),
                     "createdAt" to System.currentTimeMillis()
                 )
                 store.collection("users").document(newUser.id).set(firestoreData, SetOptions.merge()).await()

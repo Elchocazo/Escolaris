@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import android.content.Intent
@@ -1675,192 +1676,215 @@ fun TeacherDirectoryView(
         )
     }
 
-    val filteredTeachersWithIndex = remember(searchQuery, teachers) {
-        if (searchQuery.isBlank()) {
-            teachers.mapIndexed { index, teacher -> index to teacher }
-        } else {
-            val q = searchQuery.trim().lowercase()
-            teachers.mapIndexed { index, teacher -> index to teacher }.filter { (_, teacher) ->
-                teacher.name.lowercase().contains(q) ||
-                teacher.subject.lowercase().contains(q) ||
-                teacher.roleOrGrade.lowercase().contains(q) ||
-                (teacher.email?.lowercase()?.contains(q) == true) ||
-                teacher.attentionDay.lowercase().contains(q)
-            }
-        }
-    }
-
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
             .padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        item {
-            Spacer(modifier = Modifier.height(6.dp))
+        teacherDirectoryContentItems(
+            teachers = teachers,
+            searchQuery = searchQuery,
+            onSearchQueryChange = { searchQuery = it },
+            canEdit = canEdit,
+            context = context,
+            onAddTeacher = onAddTeacher,
+            onEditTeacher = onEditTeacher,
+            onDeleteTeacher = onDeleteTeacher,
+            onSelectTeacher = { idx, teacher -> selectedTeacherDetail = idx to teacher }
+        )
+    }
+}
 
-            Surface(
-                shape = RoundedCornerShape(16.dp),
-                color = MaterialTheme.colorScheme.surface,
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
-                shadowElevation = 2.dp,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(modifier = Modifier.padding(14.dp)) {
-                    // Header Title Row
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
+fun LazyListScope.teacherDirectoryContentItems(
+    teachers: List<TeacherDirectoryEntry>,
+    searchQuery: String,
+    onSearchQueryChange: (String) -> Unit,
+    canEdit: Boolean = false,
+    context: android.content.Context,
+    onAddTeacher: (() -> Unit)? = null,
+    onEditTeacher: ((Int, TeacherDirectoryEntry) -> Unit)? = null,
+    onDeleteTeacher: ((Int) -> Unit)? = null,
+    onSelectTeacher: ((Int, TeacherDirectoryEntry) -> Unit)? = null
+) {
+    val filteredTeachersWithIndex = if (searchQuery.isBlank()) {
+        teachers.mapIndexed { index, teacher -> index to teacher }
+    } else {
+        val q = searchQuery.trim().lowercase()
+        teachers.mapIndexed { index, teacher -> index to teacher }.filter { (_, teacher) ->
+            teacher.name.lowercase().contains(q) ||
+            teacher.subject.lowercase().contains(q) ||
+            teacher.roleOrGrade.lowercase().contains(q) ||
+            (teacher.email?.lowercase()?.contains(q) == true) ||
+            teacher.attentionDay.lowercase().contains(q)
+        }
+    }
+
+    item {
+        Spacer(modifier = Modifier.height(6.dp))
+
+        Surface(
+            shape = RoundedCornerShape(16.dp),
+            color = MaterialTheme.colorScheme.surface,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
+            shadowElevation = 2.dp,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(14.dp)) {
+                // Header Title Row
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("🏫", fontSize = 24.sp)
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Directorio Docente",
+                            fontWeight = FontWeight.ExtraBold,
+                            fontSize = 16.sp,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Text(
+                            text = "${teachers.size} docentes institucionales • 7° Grado",
+                            fontSize = 11.5.sp,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Dedicated Action Buttons Row
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    FilledTonalButton(
+                        onClick = {
+                            com.example.utils.PdfExporter.generateAndShareTeacherDirectory(context, teachers)
+                        },
+                        shape = RoundedCornerShape(10.dp),
+                        colors = ButtonDefaults.filledTonalButtonColors(
+                            containerColor = Color(0xFFEDE9FE),
+                            contentColor = Color(0xFF6D28D9)
+                        ),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(38.dp)
                     ) {
-                        Text("🏫", fontSize = 24.sp)
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "Directorio Docente",
-                                fontWeight = FontWeight.ExtraBold,
-                                fontSize = 16.sp,
-                                color = MaterialTheme.colorScheme.onSurface,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            Text(
-                                text = "${teachers.size} docentes institucionales • 7° Grado",
-                                fontSize = 11.5.sp,
-                                color = MaterialTheme.colorScheme.primary,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                        }
+                        Icon(
+                            imageVector = Icons.Default.FileDownload,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "Descargar PDF",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            softWrap = false
+                        )
                     }
 
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    // Dedicated Action Buttons Row (Generous spacing, never touching text, never wrapping vertically)
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        FilledTonalButton(
-                            onClick = {
-                                com.example.utils.PdfExporter.generateAndShareTeacherDirectory(context, teachers)
-                            },
+                    if (canEdit && onAddTeacher != null) {
+                        Button(
+                            onClick = onAddTeacher,
                             shape = RoundedCornerShape(10.dp),
-                            colors = ButtonDefaults.filledTonalButtonColors(
-                                containerColor = Color(0xFFEDE9FE),
-                                contentColor = Color(0xFF6D28D9)
-                            ),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF7C3AED)),
                             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
                             modifier = Modifier
                                 .weight(1f)
                                 .height(38.dp)
                         ) {
                             Icon(
-                                imageVector = Icons.Default.FileDownload,
+                                imageVector = Icons.Default.PersonAdd,
                                 contentDescription = null,
+                                tint = Color.White,
                                 modifier = Modifier.size(16.dp)
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                text = "Descargar PDF",
+                                text = "Agregar Docente",
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
+                                color = Color.White,
                                 maxLines = 1,
                                 softWrap = false
                             )
                         }
+                    }
+                }
 
-                        if (canEdit && onAddTeacher != null) {
-                            Button(
-                                onClick = onAddTeacher,
-                                shape = RoundedCornerShape(10.dp),
-                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF7C3AED)),
-                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .height(38.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.PersonAdd,
-                                    contentDescription = null,
-                                    tint = Color.White,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text(
-                                    text = "Agregar Docente",
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color.White,
-                                    maxLines = 1,
-                                    softWrap = false
-                                )
-                            }
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "Toca cualquier tarjeta para verla en grande con todos sus datos o enviar correo.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.outline
+                )
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = onSearchQueryChange,
+                    placeholder = { Text("Buscar por docente, materia o grado...", fontSize = 12.5.sp) },
+                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                    shape = RoundedCornerShape(12.dp),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        }
+    }
+
+    if (filteredTeachersWithIndex.isEmpty()) {
+        item {
+            Card(
+                shape = RoundedCornerShape(14.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp)
+            ) {
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(20.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text("🔍", fontSize = 28.sp)
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text("No se encontraron docentes con ese criterio de búsqueda.", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
+                    if (canEdit && onAddTeacher != null) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Button(onClick = onAddTeacher) {
+                            Text("+ Agregar Docente")
                         }
                     }
-
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = "Toca cualquier tarjeta para verla en grande con todos sus datos o enviar correo.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.outline
-                    )
-
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    OutlinedTextField(
-                        value = searchQuery,
-                        onValueChange = { searchQuery = it },
-                        placeholder = { Text("Buscar por docente, materia o grado...", fontSize = 12.5.sp) },
-                        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
-                        shape = RoundedCornerShape(12.dp),
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
                 }
             }
         }
-
-        if (filteredTeachersWithIndex.isEmpty()) {
-            item {
-                Card(
-                    shape = RoundedCornerShape(14.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp)
-                ) {
-                    Column(
-                        modifier = Modifier.fillMaxWidth().padding(20.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
+    } else {
+        items(filteredTeachersWithIndex, key = { it.second.name + it.first }) { (originalIndex, teacher) ->
+            Surface(
+                shape = RoundedCornerShape(16.dp),
+                color = MaterialTheme.colorScheme.surface,
+                border = BorderStroke(1.2.dp, Color(0xFF7C3AED).copy(alpha = 0.35f)),
+                shadowElevation = 1.dp,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onSelectTeacher?.invoke(originalIndex, teacher) }
+            ) {
+                Column(modifier = Modifier.padding(14.dp)) {
+                    // TOP ROW: Avatar + Nombre + Botones de Acción Rápida
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("🔍", fontSize = 28.sp)
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Text("No se encontraron docentes con ese criterio de búsqueda.", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
-                        if (canEdit && onAddTeacher != null) {
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Button(onClick = onAddTeacher) {
-                                Text("+ Agregar Docente")
-                            }
-                        }
-                    }
-                }
-            }
-        } else {
-            items(filteredTeachersWithIndex, key = { it.second.name + it.first }) { (originalIndex, teacher) ->
-                Surface(
-                    shape = RoundedCornerShape(16.dp),
-                    color = MaterialTheme.colorScheme.surface,
-                    border = BorderStroke(1.2.dp, Color(0xFF7C3AED).copy(alpha = 0.35f)),
-                    shadowElevation = 1.dp,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { selectedTeacherDetail = originalIndex to teacher }
-                ) {
-                    Column(modifier = Modifier.padding(14.dp)) {
-                        // TOP ROW: Avatar + Nombre + Botones de Acción Rápida
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
                             Row(
                                 modifier = Modifier.weight(1f),
                                 verticalAlignment = Alignment.CenterVertically
@@ -2082,7 +2106,6 @@ fun TeacherDirectoryView(
 
         item { Spacer(modifier = Modifier.height(80.dp)) }
     }
-}
 
 @Composable
 fun TeacherDetailDialog(

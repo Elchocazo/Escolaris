@@ -44,6 +44,7 @@ import androidx.compose.material.icons.filled.QrCode
 import androidx.compose.material.icons.filled.School
 import androidx.compose.material.icons.filled.FamilyRestroom
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
@@ -90,11 +91,13 @@ import coil.compose.AsyncImage
 import com.example.data.local.entity.BadgeEntity
 import com.example.data.local.entity.RedemptionEntity
 import com.example.data.local.entity.RewardEntity
+import com.example.domain.model.BadgeItem
 import com.example.domain.model.UserRole
 import com.example.ui.components.ClayBadgeItem
 import com.example.ui.components.LevelAchievementsDialog
 import com.example.ui.components.ProfilePhotoViewerDialog
 import com.example.ui.theme.AppColorTheme
+import com.example.ui.theme.DangerRed
 import com.example.ui.theme.DarkThemeMode
 import com.example.ui.theme.GoldStar
 import com.example.ui.theme.StreakOrange
@@ -118,7 +121,7 @@ val OFFICIAL_BADGES_CATALOG = listOf(
         title = "Izada de Bandera",
         description = "Honor patrio, rendimiento académico y convivencia escolar ejemplar.",
         emoji = "🇨🇴",
-        category = "CIVIC",
+        category = "STUDENT",
         xpReward = 200,
         creditReward = 100,
         clayColorHex = 0xFF2563EB
@@ -138,7 +141,7 @@ val OFFICIAL_BADGES_CATALOG = listOf(
         title = "Puntualidad de Oro",
         description = "Llegada a tiempo y cero retardos en la jornada escolar.",
         emoji = "⏰",
-        category = "EFFORT",
+        category = "STUDENT",
         xpReward = 150,
         creditReward = 80,
         clayColorHex = 0xFFF59E0B
@@ -148,7 +151,7 @@ val OFFICIAL_BADGES_CATALOG = listOf(
         title = "Compañero Solidario",
         description = "Solidaridad, ayuda en clase y trabajo en equipo respetuoso.",
         emoji = "🤝",
-        category = "COMMUNITY",
+        category = "STUDENT",
         xpReward = 180,
         creditReward = 80,
         clayColorHex = 0xFF10B981
@@ -178,7 +181,7 @@ val OFFICIAL_BADGES_CATALOG = listOf(
         title = "Expresión Artística",
         description = "Creatividad y talento destacado en artes plásticas y música.",
         emoji = "🎨",
-        category = "SPECIAL",
+        category = "STUDENT",
         xpReward = 180,
         creditReward = 85,
         clayColorHex = 0xFFEC4899
@@ -188,7 +191,7 @@ val OFFICIAL_BADGES_CATALOG = listOf(
         title = "Cuidado del Salón",
         description = "Puesto ordenado, aula limpia y respeto al mobiliario.",
         emoji = "🌱",
-        category = "COMMUNITY",
+        category = "STUDENT",
         xpReward = 150,
         creditReward = 70,
         clayColorHex = 0xFF16A34A
@@ -198,7 +201,7 @@ val OFFICIAL_BADGES_CATALOG = listOf(
         title = "Participación Activa",
         description = "Aportes constructivos y entusiasmo durante las clases.",
         emoji = "💡",
-        category = "EFFORT",
+        category = "STUDENT",
         xpReward = 170,
         creditReward = 80,
         clayColorHex = 0xFFF59E0B
@@ -208,7 +211,7 @@ val OFFICIAL_BADGES_CATALOG = listOf(
         title = "Semana Impecable",
         description = "Semana completa con tareas entregadas y disciplina constante.",
         emoji = "🔥",
-        category = "EFFORT",
+        category = "STUDENT",
         xpReward = 200,
         creditReward = 90,
         clayColorHex = 0xFFF97316
@@ -221,7 +224,7 @@ val OFFICIAL_PARENT_BADGES_CATALOG = listOf(
         title = "Pensión al Día - Octubre",
         description = "Cancelación puntual de la pensión escolar dentro de los primeros 5 días del mes.",
         emoji = "💳",
-        category = "FAMILY",
+        category = "PARENT",
         xpReward = 150,
         creditReward = 100,
         clayColorHex = 0xFF10B981
@@ -231,7 +234,7 @@ val OFFICIAL_PARENT_BADGES_CATALOG = listOf(
         title = "Asistencia a Reunión de Padres",
         description = "Participación y asistencia puntual a la asamblea general de padres de familia.",
         emoji = "👨‍👩‍👧",
-        category = "FAMILY",
+        category = "PARENT",
         xpReward = 120,
         creditReward = 80,
         clayColorHex = 0xFF2563EB
@@ -241,7 +244,7 @@ val OFFICIAL_PARENT_BADGES_CATALOG = listOf(
         title = "Escuela de Padres",
         description = "Asistencia y participación formativa en los talleres de orientación y valores familiares.",
         emoji = "🤝",
-        category = "FAMILY",
+        category = "PARENT",
         xpReward = 140,
         creditReward = 100,
         clayColorHex = 0xFF8B5CF6
@@ -251,7 +254,7 @@ val OFFICIAL_PARENT_BADGES_CATALOG = listOf(
         title = "Entrega de Informes Académicos",
         description = "Acompañamiento presencial al estudiante en el balance académico de periodo con docentes.",
         emoji = "📋",
-        category = "FAMILY",
+        category = "PARENT",
         xpReward = 120,
         creditReward = 80,
         clayColorHex = 0xFFF59E0B
@@ -261,7 +264,7 @@ val OFFICIAL_PARENT_BADGES_CATALOG = listOf(
         title = "Acompañamiento en Casa",
         description = "Supervisión constante y apoyo formativo en los deberes y proyectos escolares.",
         emoji = "🏡",
-        category = "FAMILY",
+        category = "PARENT",
         xpReward = 100,
         creditReward = 50,
         clayColorHex = 0xFF06B6D4
@@ -271,7 +274,7 @@ val OFFICIAL_PARENT_BADGES_CATALOG = listOf(
         title = "Familia Ejemplar Escolaris",
         description = "Reconocimiento de honor a la familia por su apoyo integral, respeto y valores comunitarios.",
         emoji = "🏆",
-        category = "FAMILY",
+        category = "PARENT",
         xpReward = 250,
         creditReward = 150,
         clayColorHex = 0xFFEAB308
@@ -281,7 +284,7 @@ val OFFICIAL_PARENT_BADGES_CATALOG = listOf(
         title = "Comunicación Asertiva",
         description = "Diálogo respetuoso, oportuno y constructivo con los docentes y directivos del colegio.",
         emoji = "💬",
-        category = "FAMILY",
+        category = "PARENT",
         xpReward = 100,
         creditReward = 50,
         clayColorHex = 0xFFEC4899
@@ -291,13 +294,14 @@ val OFFICIAL_PARENT_BADGES_CATALOG = listOf(
         title = "Bienestar y Cuidado Integral",
         description = "Atención permanente a la salud, nutrición y presentación personal del estudiante.",
         emoji = "🍎",
-        category = "FAMILY",
+        category = "PARENT",
         xpReward = 110,
         creditReward = 60,
         clayColorHex = 0xFF10B981
     )
 )
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun ProfileSettingsScreen(
     viewModel: SchoolViewModel,
@@ -311,32 +315,49 @@ fun ProfileSettingsScreen(
     val colorTheme by viewModel.colorTheme.collectAsState()
     val switchedFromParentId by viewModel.switchedFromParentId.collectAsState()
 
+    val context = LocalContext.current
     var selectedTabIndex by remember { mutableIntStateOf(0) }
     var selectedDayForSchedule by remember { mutableIntStateOf(1) }
     var showEditProfileDialog by remember { mutableStateOf(false) }
     var showPhotoPreviewDialog by remember { mutableStateOf(false) }
     var showCreateRewardDialog by remember { mutableStateOf(false) }
+    var rewardToEdit by remember { mutableStateOf<RewardEntity?>(null) }
+    var rewardToDelete by remember { mutableStateOf<RewardEntity?>(null) }
     var selectedRedemptionForQr by remember { mutableStateOf<RedemptionEntity?>(null) }
     var previewBadgePhotoUri by remember { mutableStateOf<String?>(null) }
     var previewBadgeTitle by remember { mutableStateOf("") }
     var selectedBadgeDetail by remember { mutableStateOf<BadgeEntity?>(null) }
     var selectedLockedBadge by remember { mutableStateOf<OfficialBadgeDefinition?>(null) }
     var showLevelAchievementsDialog by remember { mutableStateOf(false) }
+    var selectedPokemonBadgeDetail by remember { mutableStateOf<BadgeItem?>(null) }
     var studentStoreSubtab by remember { mutableIntStateOf(0) } // 0: Catálogo, 1: Mis Canjes
     var settingsSubtab by remember { mutableIntStateOf(0) } // 0: Códigos & Aula, 1: Aspecto Visual, 2: Mi Cuenta
+    var teacherDirectoryList by remember { mutableStateOf(OFFICIAL_TEACHER_DIRECTORY) }
+    var editingTeacher by remember { mutableStateOf<Pair<Int, TeacherDirectoryEntry?>?>(null) }
+    var directorySearchQuery by remember { mutableStateOf("") }
+    var selectedTeacherDetail by remember { mutableStateOf<Pair<Int, TeacherDirectoryEntry>?>(null) }
 
     val isTeacher = currentUser?.role == UserRole.TEACHER.code
-    val isParent = currentUser?.role == UserRole.PARENT.code
+    val isParent = currentUser?.role == UserRole.PARENT.code || currentUser?.role?.uppercase() == "TUTOR" || currentUser?.role?.uppercase() == "ACUDIENTE"
+    val isStudent = currentUser?.role == UserRole.STUDENT.code || currentUser?.role?.uppercase() == "STUDENT" || currentUser?.role?.uppercase() == "ALUMNO"
 
     val activeOfficialCatalog = if (isParent) OFFICIAL_PARENT_BADGES_CATALOG else OFFICIAL_BADGES_CATALOG
 
-    val userBadges = remember(allBadges, currentUser, isParent) {
+    val userBadges = remember(allBadges, currentUser, isParent, isTeacher, isStudent) {
         if (isParent) {
+            // PARENT / TUTOR: Únicamente insignias de categoría "PARENT"
             allBadges.filter {
-                it.studentId == currentUser?.id || it.category.equals("FAMILY", ignoreCase = true) || it.category.equals("PARENT", ignoreCase = true)
+                (it.studentId == currentUser?.id || it.studentId.isBlank()) &&
+                (it.category.equals("PARENT", ignoreCase = true) || it.category.equals("FAMILY", ignoreCase = true))
             }
+        } else if (isTeacher) {
+            allBadges
         } else {
-            allBadges.filter { it.studentId == currentUser?.id }
+            // STUDENT: Únicamente insignias de categoría "ACADEMIC" y "STUDENT"
+            allBadges.filter {
+                it.studentId == currentUser?.id &&
+                (it.category.equals("ACADEMIC", ignoreCase = true) || it.category.equals("STUDENT", ignoreCase = true))
+            }
         }
     }
 
@@ -367,9 +388,28 @@ fun ProfileSettingsScreen(
         } else null
     }
 
+    val profileTabs = remember(isTeacher, isParent) {
+        if (isParent) {
+            listOf(
+                "HONOR" to "Logros",
+                "DIRECTORY" to "Directorio",
+                "SETTINGS" to "Ajustes"
+            )
+        } else {
+            listOf(
+                "HONOR" to if (isTeacher) "Honor" else "Logros",
+                "STORE" to if (isTeacher) "Tienda" else "Canjes",
+                "DIRECTORY" to "Directorio",
+                "SETTINGS" to "Ajustes"
+            )
+        }
+    }
+
     var showLinkStudentDialog by remember { mutableStateOf(false) }
-    var transferAmountInput by remember { mutableStateOf("25") }
-    var transferReasonInput by remember { mutableStateOf("¡Reconocimiento por tu esfuerzo y disciplina!") }
+
+    val roleFilteredPokemonBadges = remember(currentUser?.role) {
+        filterBadgesForRole(currentUser?.role, DEFAULT_ESCOLARIS_BADGES)
+    }
 
     Box(modifier = modifier.fillMaxSize()) {
         LazyColumn(
@@ -495,9 +535,10 @@ fun ProfileSettingsScreen(
                                 Spacer(modifier = Modifier.height(8.dp))
 
                                 // Pastillas de métricas compactas
-                                Row(
+                                FlowRow(
                                     horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                    verticalAlignment = Alignment.CenterVertically
+                                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                                    modifier = Modifier.fillMaxWidth()
                                 ) {
                                     if (isTeacher) {
                                         Surface(
@@ -516,7 +557,10 @@ fun ProfileSettingsScreen(
                                                     fontWeight = FontWeight.Bold,
                                                     style = MaterialTheme.typography.labelSmall,
                                                     color = MaterialTheme.colorScheme.primary,
-                                                    fontSize = 11.sp
+                                                    fontSize = 11.sp,
+                                                    maxLines = 1,
+                                                    softWrap = false,
+                                                    overflow = TextOverflow.Ellipsis
                                                 )
                                             }
                                         }
@@ -537,7 +581,9 @@ fun ProfileSettingsScreen(
                                                     fontWeight = FontWeight.Bold,
                                                     style = MaterialTheme.typography.labelSmall,
                                                     color = Color(0xFFB45309),
-                                                    fontSize = 11.sp
+                                                    fontSize = 11.sp,
+                                                    maxLines = 1,
+                                                    softWrap = false
                                                 )
                                             }
                                         }
@@ -559,7 +605,9 @@ fun ProfileSettingsScreen(
                                                     fontWeight = FontWeight.Bold,
                                                     style = MaterialTheme.typography.labelSmall,
                                                     color = Color(0xFFB45309),
-                                                    fontSize = 11.sp
+                                                    fontSize = 11.sp,
+                                                    maxLines = 1,
+                                                    softWrap = false
                                                 )
                                             }
                                         }
@@ -583,7 +631,9 @@ fun ProfileSettingsScreen(
                                                     fontWeight = FontWeight.ExtraBold,
                                                     style = MaterialTheme.typography.labelSmall,
                                                     color = MaterialTheme.colorScheme.primary,
-                                                    fontSize = 11.sp
+                                                    fontSize = 11.sp,
+                                                    maxLines = 1,
+                                                    softWrap = false
                                                 )
                                             }
                                         }
@@ -605,7 +655,9 @@ fun ProfileSettingsScreen(
                                                     fontWeight = FontWeight.Bold,
                                                     style = MaterialTheme.typography.labelSmall,
                                                     color = Color(0xFFB45309),
-                                                    fontSize = 11.sp
+                                                    fontSize = 11.sp,
+                                                    maxLines = 1,
+                                                    softWrap = false
                                                 )
                                             }
                                         }
@@ -626,7 +678,9 @@ fun ProfileSettingsScreen(
                                                     fontWeight = FontWeight.Bold,
                                                     style = MaterialTheme.typography.labelSmall,
                                                     color = StreakOrange,
-                                                    fontSize = 11.sp
+                                                    fontSize = 11.sp,
+                                                    maxLines = 1,
+                                                    softWrap = false
                                                 )
                                             }
                                         }
@@ -637,55 +691,44 @@ fun ProfileSettingsScreen(
                     }
                 }
 
-            // Tabs (Medallas / Tienda Escolaris o Pases / Ajustes)
+            // Tabs dinámicas según rol (Logros / Directorio / Ajustes)
             item {
-                TabRow(
-                    selectedTabIndex = selectedTabIndex,
-                    containerColor = MaterialTheme.colorScheme.surface
+                val safeTabIndex = selectedTabIndex.coerceIn(0, profileTabs.size - 1)
+                Surface(
+                    shape = RoundedCornerShape(14.dp),
+                    color = MaterialTheme.colorScheme.surface,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
+                    shadowElevation = 1.dp,
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    Tab(
-                        selected = selectedTabIndex == 0,
-                        onClick = { selectedTabIndex = 0 },
-                        text = {
-                            Text(
-                                text = if (isTeacher) "🎖️ Honor" else if (isParent) "🎖️ Logros (${userBadges.size})" else "🎖️ Mis Logros (${userBadges.size})",
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 11.5.sp,
-                                maxLines = 1,
-                                softWrap = false
+                    TabRow(
+                        selectedTabIndex = safeTabIndex,
+                        containerColor = MaterialTheme.colorScheme.surface,
+                        divider = {}
+                    ) {
+                        profileTabs.forEachIndexed { index, (_, title) ->
+                            Tab(
+                                selected = safeTabIndex == index,
+                                onClick = { selectedTabIndex = index },
+                                text = {
+                                    Text(
+                                        text = title,
+                                        fontWeight = if (safeTabIndex == index) FontWeight.Bold else FontWeight.Medium,
+                                        fontSize = 13.sp,
+                                        maxLines = 1,
+                                        softWrap = false,
+                                        overflow = TextOverflow.Clip
+                                    )
+                                }
                             )
                         }
-                    )
-                    Tab(
-                        selected = selectedTabIndex == 1,
-                        onClick = { selectedTabIndex = 1 },
-                        text = {
-                            Text(
-                                text = if (isParent) "🪙 Ceder" else "🎟️ Canjes",
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 11.5.sp,
-                                maxLines = 1,
-                                softWrap = false
-                            )
-                        }
-                    )
-                    Tab(
-                        selected = selectedTabIndex == 2,
-                        onClick = { selectedTabIndex = 2 },
-                        text = {
-                            Text(
-                                text = "⚙️ Ajustes",
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 11.5.sp,
-                                maxLines = 1,
-                                softWrap = false
-                            )
-                        }
-                    )
+                    }
                 }
             }
 
-            if (selectedTabIndex == 0) {
+            val currentTabKey = profileTabs.getOrNull(selectedTabIndex.coerceIn(0, profileTabs.size - 1))?.first ?: "HONOR"
+
+            if (currentTabKey == "HONOR") {
                 // BADGES TAB
                 if (isTeacher) {
                     item {
@@ -729,109 +772,66 @@ fun ProfileSettingsScreen(
                         }
                     }
                 } else {
-                    val totalOfficialCount = activeOfficialCatalog.size
-                    val unlockedCount = userBadges.size
+                    val totalOfficialCount = roleFilteredPokemonBadges.size
+                    val unlockedCount = roleFilteredPokemonBadges.count { it.isUnlocked }
                     val progressFloat = if (totalOfficialCount > 0) (unlockedCount.toFloat() / totalOfficialCount.toFloat()).coerceIn(0f, 1f) else 0f
                     val progressPercent = (progressFloat * 100).toInt()
 
-                    // Header con Progreso de Desbloqueo y Leyenda Explicativa
+                    // Header con Progreso de Desbloqueo Pokémon GO
                     item {
-                        ElevatedCard(
-                            shape = RoundedCornerShape(20.dp),
-                            colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface),
-                            elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp),
-                            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)
+                        PokemonGoShowcaseHeader(
+                            unlockedCount = unlockedCount,
+                            totalCount = totalOfficialCount,
+                            progressPercent = progressPercent,
+                            progressFraction = progressFloat
+                        )
+                    }
+
+                    item {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(top = 4.dp)
                         ) {
-                            Column(modifier = Modifier.padding(16.dp)) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text(
-                                            text = if (isParent) "🎖️ Condecoraciones Familiares" else "🎖️ Muro de Condecoraciones",
-                                            style = MaterialTheme.typography.titleMedium,
-                                            fontWeight = FontWeight.ExtraBold
-                                        )
-                                        Text(
-                                            text = "$unlockedCount de $totalOfficialCount Insignias Desbloqueadas ($progressPercent%)",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = MaterialTheme.colorScheme.primary,
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                    }
-
-                                    Surface(
-                                        shape = RoundedCornerShape(8.dp),
-                                        color = if (unlockedCount > 0) GoldStar.copy(alpha = 0.18f) else MaterialTheme.colorScheme.surfaceVariant
-                                    ) {
-                                        Text(
-                                            text = if (unlockedCount > 0) "🌟 $progressPercent%" else "🔒 0%",
-                                            fontWeight = FontWeight.ExtraBold,
-                                            color = if (unlockedCount > 0) Color(0xFFB45309) else MaterialTheme.colorScheme.outline,
-                                            fontSize = 12.sp,
-                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                                        )
-                                    }
-                                }
-
-                                Spacer(modifier = Modifier.height(10.dp))
-
-                                LinearProgressIndicator(
-                                    progress = { progressFloat },
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(8.dp)
-                                        .clip(RoundedCornerShape(4.dp)),
-                                    color = MaterialTheme.colorScheme.primary,
-                                    trackColor = MaterialTheme.colorScheme.surfaceVariant
-                                )
-
-                                Spacer(modifier = Modifier.height(10.dp))
-
-                                Surface(
-                                    shape = RoundedCornerShape(10.dp),
-                                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f),
-                                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.2f))
-                                ) {
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 6.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Text("💡", fontSize = 13.sp)
-                                        Spacer(modifier = Modifier.width(6.dp))
-                                        Text(
-                                            text = if (isParent)
-                                                "Condecoraciones por acompañamiento familiar, pensión y deberes escolares. Las ganadas brillan a todo color."
-                                            else
-                                                "Las insignias ganadas brillan a todo color. Las bloqueadas aparecen en baja opacidad con su objetivo para desbloquear.",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = MaterialTheme.colorScheme.onSurface,
-                                            fontSize = 10.5.sp
-                                        )
-                                    }
-                                }
-                            }
+                            Text("🏅", fontSize = 18.sp)
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = if (isParent) "Medallero Familiar de Compromiso Escolar" else "Medallero de Retos y Metas Estudiantiles",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold
+                            )
                         }
                     }
 
-                    // Renderizar catálogo activo (Desbloqueadas a todo color, Bloqueadas en baja opacidad)
-                    items(activeOfficialCatalog, key = { it.key }) { def ->
-                        val earnedBadge = unlockedBadgesMap[def.key.uppercase()] ?: unlockedBadgesByTitle[def.title.trim().lowercase()]
-                        if (earnedBadge != null) {
+                    // Cuadrícula Pokémon GO (3 por fila)
+                    roleFilteredPokemonBadges.chunked(3).forEach { rowBadges ->
+                        item {
+                            PokemonGoBadgesRow(
+                                badgesInRow = rowBadges,
+                                onBadgeClick = { selectedPokemonBadgeDetail = it }
+                            )
+                        }
+                    }
+
+                    // Reconocimientos especiales e insignias ganadas en el registro oficial
+                    if (userBadges.isNotEmpty()) {
+                        item {
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = if (isParent) "🎖️ Condecoraciones Familiares Obtenidas (${userBadges.size}):" else "🎖️ Reconocimientos Obtenidos (${userBadges.size}):",
+                                fontWeight = FontWeight.Bold,
+                                style = MaterialTheme.typography.titleSmall,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+
+                        items(userBadges, key = { it.id }) { badge ->
                             RecognitionWallCard(
-                                badge = earnedBadge,
+                                badge = badge,
                                 onPhotoClick = { photoUri ->
                                     previewBadgePhotoUri = photoUri
-                                    previewBadgeTitle = "${earnedBadge.emoji} ${earnedBadge.title}"
+                                    previewBadgeTitle = "${badge.emoji} ${badge.title}"
                                 },
-                                onClick = { selectedBadgeDetail = earnedBadge }
-                            )
-                        } else {
-                            LockedRecognitionCard(
-                                badgeDef = def,
-                                onClick = { selectedLockedBadge = def }
+                                onClick = { selectedBadgeDetail = badge }
                             )
                         }
                     }
@@ -860,15 +860,14 @@ fun ProfileSettingsScreen(
                         }
                     }
                 }
-            } else if (selectedTabIndex == 1) {
-                if (isParent) {
-                    // PARENT TRANSFER & INFORMATIVE CATALOG TAB
+            } else if (currentTabKey == "STORE") {
+                // TEACHER & STUDENT VIEW (Pases, Canjes y Tienda Escolar)
                     item {
                         Surface(
                             shape = RoundedCornerShape(20.dp),
                             color = MaterialTheme.colorScheme.surface,
                             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
-                            shadowElevation = 2.dp,
+                            shadowElevation = 1.dp,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(vertical = 6.dp)
@@ -876,221 +875,26 @@ fun ProfileSettingsScreen(
                             Column(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(horizontal = 20.dp, vertical = 20.dp),
+                                    .padding(horizontal = 16.dp, vertical = 14.dp),
                                 horizontalAlignment = Alignment.CenterHorizontally
                             ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(54.dp)
-                                        .clip(CircleShape)
-                                        .background(GoldStar.copy(alpha = 0.2f)),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text("🪙", fontSize = 28.sp)
-                                }
-                                Spacer(modifier = Modifier.height(10.dp))
-                                Text(
-                                    text = "Saldo de Escolaris para Ceder",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontSize = 18.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                                )
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text(
-                                    text = "🪙 ${currentUser?.credits ?: 0} Escolaris",
-                                    fontSize = 28.sp,
-                                    fontWeight = FontWeight.ExtraBold,
-                                    color = Color(0xFFB45309),
-                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                                )
-                                Spacer(modifier = Modifier.height(6.dp))
-                                Text(
-                                    text = "Como acudiente, tus Escolaris están destinados exclusivamente a motivar y premiar el esfuerzo de tu hijo/a. No necesitas canjear recompensas para ti.",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    fontSize = 13.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                                    modifier = Modifier.padding(horizontal = 8.dp)
-                                )
-                            }
-                        }
-                    }
-
-                    // Card de Ceder Escolaris
-                    item {
-                        Surface(
-                            shape = RoundedCornerShape(18.dp),
-                            color = MaterialTheme.colorScheme.surface,
-                            border = BorderStroke(1.dp, GoldStar.copy(alpha = 0.5f)),
-                            shadowElevation = 2.dp,
-                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
-                        ) {
-                            Column(
-                                modifier = Modifier.padding(18.dp),
-                                verticalArrangement = Arrangement.spacedBy(12.dp)
-                            ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Text("🎁", fontSize = 22.sp)
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Text(
-                                            text = "Transferir Escolaris a mi Hijo/a",
-                                            fontWeight = FontWeight.Bold,
-                                            style = MaterialTheme.typography.titleMedium
-                                        )
-                                    }
-                                }
-
-                                if (linkedStudent != null) {
-                                    Surface(
-                                        shape = RoundedCornerShape(12.dp),
-                                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f),
-                                        modifier = Modifier.fillMaxWidth()
-                                    ) {
-                                        Row(
-                                            modifier = Modifier.padding(12.dp),
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.SpaceBetween
-                                        ) {
-                                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                                Text(linkedStudent.avatarEmoji.ifBlank { "🎓" }, fontSize = 24.sp)
-                                                Spacer(modifier = Modifier.width(10.dp))
-                                                Column {
-                                                    Text(
-                                                        text = linkedStudent.name,
-                                                        fontWeight = FontWeight.Bold,
-                                                        style = MaterialTheme.typography.bodyMedium
-                                                    )
-                                                    Text(
-                                                        text = "${linkedStudent.gradeSection} • Código: ${linkedStudent.studentCode}",
-                                                        style = MaterialTheme.typography.labelSmall,
-                                                        color = MaterialTheme.colorScheme.outline
-                                                    )
-                                                }
-                                            }
-                                            Column(horizontalAlignment = Alignment.End) {
-                                                Text("Saldo actual", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
-                                                Text(
-                                                    "🪙 ${linkedStudent.credits} Escolaris",
-                                                    fontWeight = FontWeight.ExtraBold,
-                                                    style = MaterialTheme.typography.bodyMedium,
-                                                    color = Color(0xFFB45309)
-                                                )
-                                            }
-                                        }
-                                    }
-
-                                    Text("Selecciona o ingresa la cantidad a ceder:", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
-
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                    ) {
-                                        listOf("10", "25", "50", "100").forEach { preset ->
-                                            val isSelected = transferAmountInput == preset
-                                            Button(
-                                                onClick = { transferAmountInput = preset },
-                                                colors = if (isSelected) ButtonDefaults.buttonColors(containerColor = GoldStar, contentColor = Color.Black) else ButtonDefaults.filledTonalButtonColors(),
-                                                shape = RoundedCornerShape(10.dp),
-                                                modifier = Modifier.weight(1f)
-                                            ) {
-                                                Text("+$preset 🪙", fontWeight = FontWeight.Bold, fontSize = 11.sp)
-                                            }
-                                        }
-                                    }
-
-                                    OutlinedTextField(
-                                        value = transferAmountInput,
-                                        onValueChange = { transferAmountInput = it.filter { ch -> ch.isDigit() } },
-                                        label = { Text("Cantidad personalizada (🪙 Escolaris)") },
-                                        shape = RoundedCornerShape(12.dp),
-                                        modifier = Modifier.fillMaxWidth(),
-                                        singleLine = true
+                                if (isTeacher) {
+                                    Text(
+                                        text = "🛍️ Gestión de Tienda y Canjes",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontSize = 17.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
                                     )
-
-                                    OutlinedTextField(
-                                        value = transferReasonInput,
-                                        onValueChange = { transferReasonInput = it },
-                                        label = { Text("Motivo del incentivo familiar (Opcional)") },
-                                        shape = RoundedCornerShape(12.dp),
-                                        modifier = Modifier.fillMaxWidth()
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(
+                                        text = "Publica recompensas y valida los pases de los alumnos.",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.outline,
+                                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
                                     )
-
-                                    val amountInt = transferAmountInput.toIntOrNull() ?: 0
-                                    val parentCredits = currentUser?.credits ?: 0
-                                    val canTransfer = amountInt in 1..parentCredits
-
-                                    Button(
-                                        onClick = {
-                                            if (amountInt > 0) {
-                                                viewModel.transferParentPointsToChild(amountInt, transferReasonInput)
-                                            }
-                                        },
-                                        enabled = canTransfer,
-                                        colors = ButtonDefaults.buttonColors(containerColor = GoldStar, contentColor = Color.Black),
-                                        shape = RoundedCornerShape(12.dp),
-                                        modifier = Modifier.fillMaxWidth().height(48.dp)
-                                    ) {
-                                        Text(
-                                            text = if (amountInt <= 0) "Ingresa cantidad válida" else if (amountInt > parentCredits) "Saldo insuficiente (🪙 $parentCredits)" else "Ceder +$amountInt 🪙 Escolaris a ${linkedStudent.name} 🚀",
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 14.sp
-                                        )
-                                    }
                                 } else {
-                                    Surface(
-                                        shape = RoundedCornerShape(12.dp),
-                                        color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f),
-                                        modifier = Modifier.fillMaxWidth()
-                                    ) {
-                                        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                            Text(
-                                                text = "⚠️ No tienes una cuenta de estudiante vinculada.",
-                                                fontWeight = FontWeight.Bold,
-                                                color = MaterialTheme.colorScheme.error
-                                            )
-                                            Text(
-                                                text = "Para ceder Escolaris, primero debes ingresar el código de estudiante de tu hijo/a (Ej. ESC-100201).",
-                                                style = MaterialTheme.typography.bodySmall
-                                            )
-                                            Button(
-                                                onClick = { showLinkStudentDialog = true },
-                                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-                                                shape = RoundedCornerShape(10.dp)
-                                            ) {
-                                                Text("🔑 Vincular Código de Estudiante", fontWeight = FontWeight.Bold)
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                } else {
-                    // TEACHER & STUDENT VIEW (Pases y Canjes exclusivamente)
-                    if (!isTeacher) {
-                        item {
-                            Surface(
-                                shape = RoundedCornerShape(20.dp),
-                                color = MaterialTheme.colorScheme.surface,
-                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
-                                shadowElevation = 1.dp,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 6.dp)
-                            ) {
-                                Column(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(horizontal = 16.dp, vertical = 14.dp),
-                                    horizontalAlignment = Alignment.CenterHorizontally
-                                ) {
                                     Text(
                                         text = "Saldo Disponible: 🪙 ${currentUser?.credits ?: 0} Escolaris",
                                         style = MaterialTheme.typography.titleMedium,
@@ -1099,35 +903,49 @@ fun ProfileSettingsScreen(
                                         color = Color(0xFFB45309),
                                         textAlign = androidx.compose.ui.text.style.TextAlign.Center
                                     )
-                                    Spacer(modifier = Modifier.height(10.dp))
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                }
+                                Spacer(modifier = Modifier.height(10.dp))
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Button(
+                                        onClick = { studentStoreSubtab = 0 },
+                                        colors = if (studentStoreSubtab == 0) ButtonDefaults.buttonColors(containerColor = GoldStar, contentColor = Color.Black) else ButtonDefaults.filledTonalButtonColors(),
+                                        shape = RoundedCornerShape(10.dp),
+                                        modifier = Modifier.weight(1f)
                                     ) {
-                                        Button(
-                                            onClick = { studentStoreSubtab = 0 },
-                                            colors = if (studentStoreSubtab == 0) ButtonDefaults.buttonColors(containerColor = GoldStar, contentColor = Color.Black) else ButtonDefaults.filledTonalButtonColors(),
-                                            shape = RoundedCornerShape(10.dp),
-                                            modifier = Modifier.weight(1f)
-                                        ) {
-                                            Text("🎁 Catálogo (${rewards.size})", fontWeight = FontWeight.Bold, fontSize = 11.sp, softWrap = false)
-                                        }
-                                        Button(
-                                            onClick = { studentStoreSubtab = 1 },
-                                            colors = if (studentStoreSubtab == 1) ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary) else ButtonDefaults.filledTonalButtonColors(),
-                                            shape = RoundedCornerShape(10.dp),
-                                            modifier = Modifier.weight(1f)
-                                        ) {
-                                            Text("📜 Mis Canjes (${myRedemptions.size})", fontWeight = FontWeight.Bold, fontSize = 11.sp, softWrap = false)
-                                        }
+                                        Text(if (isTeacher) "🛍️ Tienda (${rewards.size})" else "🎁 Catálogo (${rewards.size})", fontWeight = FontWeight.Bold, fontSize = 11.sp, softWrap = false)
+                                    }
+                                    Button(
+                                        onClick = { studentStoreSubtab = 1 },
+                                        colors = if (studentStoreSubtab == 1) ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary) else ButtonDefaults.filledTonalButtonColors(),
+                                        shape = RoundedCornerShape(10.dp),
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+                                        Text(if (isTeacher) "🎟️ Pases (${myRedemptions.size})" else "📜 Mis Canjes (${myRedemptions.size})", fontWeight = FontWeight.Bold, fontSize = 11.sp, softWrap = false)
+                                    }
+                                }
+
+                                if (isTeacher && studentStoreSubtab == 0) {
+                                    Spacer(modifier = Modifier.height(10.dp))
+                                    Button(
+                                        onClick = { showCreateRewardDialog = true },
+                                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                                        shape = RoundedCornerShape(10.dp),
+                                        modifier = Modifier.fillMaxWidth().height(38.dp)
+                                    ) {
+                                        Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text("Crear Nuevo Premio ✨", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                                     }
                                 }
                             }
                         }
                     }
 
-                    if (!isTeacher && studentStoreSubtab == 0) {
-                        // STUDENT STORE CATALOG
+                    if (studentStoreSubtab == 0) {
+                        // STORE CATALOG
                         if (rewards.isEmpty()) {
                             item {
                                 Card(
@@ -1142,7 +960,7 @@ fun ProfileSettingsScreen(
                                         Text("🎁", fontSize = 40.sp)
                                         Spacer(modifier = Modifier.height(8.dp))
                                         Text("Catálogo vacío", fontWeight = FontWeight.Bold)
-                                        Text("No hay recompensas escolares registradas.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
+                                        Text(if (isTeacher) "Crea un premio con el botón superior para tus alumnos." else "No hay recompensas escolares registradas.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
                                     }
                                 }
                             }
@@ -1150,74 +968,15 @@ fun ProfileSettingsScreen(
                             items(rewards, key = { it.id }) { reward ->
                                 val userCredits = currentUser?.credits ?: 0
                                 val canAfford = userCredits >= reward.costCredits && reward.stockAvailable > 0
-                                Surface(
-                                    shape = RoundedCornerShape(16.dp),
-                                    color = MaterialTheme.colorScheme.surface,
-                                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
-                                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
-                                ) {
-                                    Column(modifier = Modifier.padding(14.dp)) {
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.SpaceBetween
-                                        ) {
-                                            Surface(
-                                                shape = RoundedCornerShape(8.dp),
-                                                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f)
-                                            ) {
-                                                Text(
-                                                    text = reward.category,
-                                                    style = MaterialTheme.typography.labelSmall,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = MaterialTheme.colorScheme.primary,
-                                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
-                                                )
-                                            }
-                                            Text(
-                                                text = "🪙 ${reward.costCredits} créditos",
-                                                fontWeight = FontWeight.ExtraBold,
-                                                color = Color(0xFFB45309),
-                                                fontSize = 13.sp
-                                            )
-                                        }
-                                        Spacer(modifier = Modifier.height(6.dp))
-                                        Text(
-                                            text = reward.title,
-                                            fontWeight = FontWeight.Bold,
-                                            style = MaterialTheme.typography.titleSmall
-                                        )
-                                        Text(
-                                            text = reward.description,
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                        Spacer(modifier = Modifier.height(10.dp))
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.SpaceBetween,
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Text(
-                                                text = "Stock: ${reward.stockAvailable} disp.",
-                                                style = MaterialTheme.typography.labelSmall,
-                                                color = MaterialTheme.colorScheme.outline
-                                            )
-                                            Button(
-                                                onClick = { viewModel.redeemReward(reward) },
-                                                enabled = canAfford,
-                                                colors = ButtonDefaults.buttonColors(containerColor = GoldStar, contentColor = Color.Black),
-                                                shape = RoundedCornerShape(10.dp)
-                                            ) {
-                                                Text(
-                                                    text = if (!canAfford && reward.stockAvailable > 0) "Faltan ${reward.costCredits - userCredits} 🪙" else "Canjear 🎟️",
-                                                    fontWeight = FontWeight.Bold,
-                                                    fontSize = 11.sp
-                                                )
-                                            }
-                                        }
-                                    }
-                                }
+                                RewardItemCard(
+                                    reward = reward,
+                                    canAfford = canAfford,
+                                    isTeacher = isTeacher,
+                                    isParent = false,
+                                    onRedeem = { viewModel.redeemReward(reward) },
+                                    onEdit = { rewardToEdit = reward },
+                                    onDelete = { rewardToDelete = reward }
+                                )
                             }
                         }
                     } else {
@@ -1259,9 +1018,27 @@ fun ProfileSettingsScreen(
                             }
                         }
                     }
-                }
+            } else if (currentTabKey == "DIRECTORY") {
+                // TEACHER DIRECTORY TAB (📞 Directorio)
+                teacherDirectoryContentItems(
+                    teachers = teacherDirectoryList,
+                    searchQuery = directorySearchQuery,
+                    onSearchQueryChange = { directorySearchQuery = it },
+                    canEdit = isTeacher,
+                    context = context,
+                    onAddTeacher = if (isTeacher) { { editingTeacher = Pair(-1, null) } } else null,
+                    onEditTeacher = if (isTeacher) { { index, teacher -> editingTeacher = Pair(index, teacher) } } else null,
+                    onDeleteTeacher = if (isTeacher) { { index ->
+                        if (index in teacherDirectoryList.indices) {
+                            teacherDirectoryList = teacherDirectoryList.toMutableList().apply { removeAt(index) }
+                        }
+                    } } else null,
+                    onSelectTeacher = { index, teacher ->
+                        selectedTeacherDetail = Pair(index, teacher)
+                    }
+                )
             } else {
-                // SETTINGS & THEMES TAB (selectedTabIndex == 2)
+                // SETTINGS & THEMES TAB (selectedTabIndex == 3)
                 item {
                     val clipboardManager = LocalClipboardManager.current
                     val studentCodeDisplay = currentUser?.studentCode?.ifBlank { "ESC-${(currentUser?.id ?: "000000").takeLast(6).uppercase()}" } ?: "ESC-100201"
@@ -1684,6 +1461,58 @@ fun ProfileSettingsScreen(
         )
     }
 
+    rewardToEdit?.let { targetReward ->
+        EditRewardDialog(
+            reward = targetReward,
+            onDismiss = { rewardToEdit = null },
+            onSave = { title, desc, cost, category, stock ->
+                viewModel.updateTeacherReward(
+                    rewardId = targetReward.id,
+                    title = title,
+                    desc = desc,
+                    cost = cost,
+                    category = category,
+                    stock = stock,
+                    icon = targetReward.iconKey
+                )
+                rewardToEdit = null
+            }
+        )
+    }
+
+    rewardToDelete?.let { targetReward ->
+        AlertDialog(
+            onDismissRequest = { rewardToDelete = null },
+            shape = RoundedCornerShape(16.dp),
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Icon(Icons.Default.Warning, contentDescription = null, tint = DangerRed)
+                    Text("¿Eliminar Recompensa?", fontWeight = FontWeight.Bold)
+                }
+            },
+            text = {
+                Text("¿Estás seguro de que deseas eliminar permanentemente '${targetReward.title}' de la tienda escolar? Los estudiantes ya no podrán canjearla.")
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.deleteReward(targetReward)
+                        rewardToDelete = null
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = DangerRed),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Text("Eliminar")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { rewardToDelete = null }) {
+                    Text("Cancelar")
+                }
+            }
+        )
+    }
+
     if (showLinkStudentDialog) {
         var studentCodeInput by remember { mutableStateOf("") }
         AlertDialog(
@@ -1739,6 +1568,45 @@ fun ProfileSettingsScreen(
             currentXp = currentUser?.xp ?: 0,
             unlockedBadgeTitles = unlockedTitles,
             onDismiss = { showLevelAchievementsDialog = false }
+        )
+    }
+
+    selectedTeacherDetail?.let { (idx, teacher) ->
+        TeacherDetailDialog(
+            teacher = teacher,
+            onDismiss = { selectedTeacherDetail = null },
+            onEdit = if (isTeacher) { { editingTeacher = Pair(idx, teacher) } } else null,
+            onDelete = if (isTeacher) { {
+                if (idx in teacherDirectoryList.indices) {
+                    teacherDirectoryList = teacherDirectoryList.toMutableList().apply { removeAt(idx) }
+                }
+                selectedTeacherDetail = null
+            } } else null
+        )
+    }
+
+    if (editingTeacher != null) {
+        val (index, teacher) = editingTeacher!!
+        EditTeacherDialog(
+            initialTeacher = teacher,
+            onDismiss = { editingTeacher = null },
+            onSave = { updatedTeacher ->
+                val list = teacherDirectoryList.toMutableList()
+                if (index in list.indices) {
+                    list[index] = updatedTeacher
+                } else {
+                    list.add(updatedTeacher)
+                }
+                teacherDirectoryList = list
+                editingTeacher = null
+            }
+        )
+    }
+
+    selectedPokemonBadgeDetail?.let { badge ->
+        PokemonGoBadgeDetailDialog(
+            badge = badge,
+            onDismiss = { selectedPokemonBadgeDetail = null }
         )
     }
 }
