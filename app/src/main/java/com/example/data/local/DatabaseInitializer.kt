@@ -1363,23 +1363,23 @@ object DatabaseInitializer {
             phoneNumber = "3158908125"
         ),
         UserEntity(
-            id = "par_1059246862_1",
+            id = "45ffface-2f81-4fbd-978d-f7ba59663232",
             name = "María Mercedes Echavarria Pizo",
-            email = "mercedes.echavarria1059246862@escolaris.edu.co",
+            email = "mekisa192227@gmail.com",
             role = "PARENT",
             studentCode = "",
             avatarColorHex = 0xFF059669,
             avatarInitials = "ME",
             gradeSection = "Padre/Tutor de Samuel Echavarria",
             streakDays = 1,
-            xp = 50,
+            xp = 350,
             level = 1,
-            credits = 100,
-            parentIncentiveCredits = 100,
+            credits = 300,
+            parentIncentiveCredits = 200,
             linkedStudentId = "std_1059246862",
-            bio = "Acudiente de Samuel Echavarria Pizo | Tel: 3158908125 - 3023087643 | Calle 7A # 12-36",
+            bio = "Acudiente de Samuel Echavarria Pizo | Tel: 3235421090 | Calle 7A # 12-36",
             avatarEmoji = "👨‍👩‍👧",
-            phoneNumber = "3158908125"
+            phoneNumber = "3235421090"
         ),
 
         // ==========================================
