@@ -144,6 +144,7 @@ fun TeacherAdminDashboardScreen(
     var showIssuePenaltyDialog by remember { mutableStateOf(false) }
     var showAddSubjectDialog by remember { mutableStateOf(false) }
     var showAddUserDialog by remember { mutableStateOf(false) }
+    var parentToLink by remember { mutableStateOf<UserEntity?>(null) }
     var showResetPointsConfirmationDialog by remember { mutableStateOf(false) }
     var showCreateRewardDialog by remember { mutableStateOf(false) }
     var rewardToEdit by remember { mutableStateOf<RewardEntity?>(null) }
@@ -874,11 +875,13 @@ fun TeacherAdminDashboardScreen(
                             items(filteredUsers, key = { it.id }) { user ->
                                 AdminUserRowCard(
                                     user = user,
+                                    allUsers = allUsers,
                                     isCurrentUser = user.id == currentUser?.id,
                                     onPhotoClick = { selectedUserForPhoto = user },
                                     onEditClick = { userToEdit = user },
                                     onAdjustPointsClick = { userToAdjustPoints = user },
-                                    onDeleteClick = { userToDelete = user }
+                                    onDeleteClick = { userToDelete = user },
+                                    onLinkParentClick = { parentToLink = user }
                                 )
                             }
                         }
@@ -1025,11 +1028,25 @@ fun TeacherAdminDashboardScreen(
         )
     }
 
+    parentToLink?.let { parent ->
+        AdminLinkParentChildDialog(
+            parent = parent,
+            students = students,
+            allUsers = allUsers,
+            onDismiss = { parentToLink = null },
+            onLink = { studentId ->
+                viewModel.adminLinkParentToStudent(parent.id, studentId)
+                parentToLink = null
+            }
+        )
+    }
+
     if (showAddUserDialog) {
         AdminAddUserDialog(
+            students = students,
             onDismiss = { showAddUserDialog = false },
-            onAdd = { name, email, role, grade, credits, xp ->
-                viewModel.adminCreateUser(name, email, role, grade, credits, xp)
+            onAdd = { name, email, role, grade, credits, xp, linkedChildId ->
+                viewModel.adminCreateUser(name, email, role, grade, credits, xp, linkedChildId)
             }
         )
     }
@@ -1037,9 +1054,10 @@ fun TeacherAdminDashboardScreen(
     userToEdit?.let { target ->
         AdminEditUserDialog(
             user = target,
+            students = students,
             onDismiss = { userToEdit = null },
-            onSave = { name, email, role, grade, credits, xp, code ->
-                viewModel.adminUpdateUser(target.id, name, email, role, grade, credits, xp, code)
+            onSave = { name, email, role, grade, credits, xp, code, linkedChildId ->
+                viewModel.adminUpdateUser(target.id, name, email, role, grade, credits, xp, code, linkedChildId)
             }
         )
     }
@@ -3190,11 +3208,13 @@ fun AddSubjectDialog(
 @Composable
 fun AdminUserRowCard(
     user: UserEntity,
+    allUsers: List<UserEntity> = emptyList(),
     isCurrentUser: Boolean,
     onPhotoClick: () -> Unit,
     onEditClick: () -> Unit,
     onAdjustPointsClick: () -> Unit,
-    onDeleteClick: () -> Unit
+    onDeleteClick: () -> Unit,
+    onLinkParentClick: (() -> Unit)? = null
 ) {
     val roleBadgeColor = when (user.role) {
         UserRole.TEACHER.code -> GoldStar
@@ -3206,6 +3226,12 @@ fun AdminUserRowCard(
         UserRole.TEACHER.code -> "Docente"
         UserRole.PARENT.code -> "Acudiente"
         else -> "Estudiante"
+    }
+
+    val linkedStudent = remember(user.linkedStudentId, allUsers) {
+        if (user.linkedStudentId.isNullOrBlank()) null else {
+            allUsers.find { it.id == user.linkedStudentId || (it.studentCode.isNotBlank() && it.studentCode.equals(user.linkedStudentId, ignoreCase = true)) }
+        }
     }
 
     Surface(
@@ -3319,6 +3345,47 @@ fun AdminUserRowCard(
                 }
             }
 
+            // If Parent, show linked child badge / alert
+            if (user.role == UserRole.PARENT.code) {
+                Spacer(modifier = Modifier.height(6.dp))
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = if (linkedStudent != null) MaterialTheme.colorScheme.primary.copy(alpha = 0.08f) else DangerRed.copy(alpha = 0.08f),
+                    border = BorderStroke(1.dp, if (linkedStudent != null) MaterialTheme.colorScheme.primary.copy(alpha = 0.25f) else DangerRed.copy(alpha = 0.3f)),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onLinkParentClick?.invoke() }
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.weight(1f, fill = false),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Text(if (linkedStudent != null) "🎓" else "⚠️", fontSize = 12.sp)
+                            Text(
+                                text = if (linkedStudent != null) "Hijo/a: ${linkedStudent.name} (${linkedStudent.gradeSection})" else "Sin estudiante vinculado",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = if (linkedStudent != null) MaterialTheme.colorScheme.primary else DangerRed,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                        Text(
+                            text = "Cambiar 🔗",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+            }
+
             Spacer(modifier = Modifier.height(8.dp))
 
             // Sub-bar with Points info & Action buttons
@@ -3366,8 +3433,22 @@ fun AdminUserRowCard(
                     }
                 }
 
-                // Actions (Edit, Points, Delete)
+                // Actions (Link, Points, Edit, Delete)
                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+                    if (user.role == UserRole.PARENT.code && onLinkParentClick != null) {
+                        IconButton(
+                            onClick = onLinkParentClick,
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.PersonAdd,
+                                contentDescription = "Vincular Hijo/a",
+                                tint = Color(0xFF2563EB),
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
+
                     IconButton(
                         onClick = onAdjustPointsClick,
                         modifier = Modifier.size(32.dp)
@@ -3412,9 +3493,177 @@ fun AdminUserRowCard(
 }
 
 @Composable
-fun AdminAddUserDialog(
+fun AdminLinkParentChildDialog(
+    parent: UserEntity,
+    students: List<UserEntity>,
+    allUsers: List<UserEntity>,
     onDismiss: () -> Unit,
-    onAdd: (name: String, email: String, role: String, gradeSection: String, credits: Int, xp: Int) -> Unit
+    onLink: (studentId: String?) -> Unit
+) {
+    var searchQuery by remember { mutableStateOf("") }
+    val currentLinkedStudent = remember(parent.linkedStudentId, allUsers) {
+        if (parent.linkedStudentId.isNullOrBlank()) null else {
+            allUsers.find { it.id == parent.linkedStudentId || (it.studentCode.isNotBlank() && it.studentCode.equals(parent.linkedStudentId, ignoreCase = true)) }
+        }
+    }
+    var selectedStudentId by remember { mutableStateOf(currentLinkedStudent?.id ?: parent.linkedStudentId.orEmpty()) }
+
+    val filteredStudents = remember(students, searchQuery) {
+        if (searchQuery.isBlank()) {
+            students.sortedBy { it.name }
+        } else {
+            val q = searchQuery.trim().lowercase()
+            students.filter {
+                it.name.lowercase().contains(q) ||
+                it.studentCode.lowercase().contains(q) ||
+                it.gradeSection.lowercase().contains(q) ||
+                it.email.lowercase().contains(q)
+            }.sortedBy { it.name }
+        }
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("👨‍👧", fontSize = 24.sp)
+                Column {
+                    Text("Vincular Padre e Hijo", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    Text("Acudiente: ${parent.name}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 420.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Text(
+                    text = "Selecciona el estudiante que debe estar a cargo de este acudiente:",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    label = { Text("Buscar por nombre o grado...") },
+                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    singleLine = true
+                )
+
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f, fill = false),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    // Option: Desvincular / Ninguno
+                    item {
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = if (selectedStudentId.isBlank()) DangerRed.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                            border = BorderStroke(1.dp, if (selectedStudentId.isBlank()) DangerRed else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { selectedStudentId = "" }
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(10.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Text("❌", fontSize = 16.sp)
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text("Sin estudiante vinculado", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                                    Text("Desvincula al acudiente de cualquier alumno", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                                if (selectedStudentId.isBlank()) {
+                                    Icon(Icons.Default.Check, contentDescription = null, tint = DangerRed, modifier = Modifier.size(18.dp))
+                                }
+                            }
+                        }
+                    }
+
+                    items(filteredStudents, key = { it.id }) { student ->
+                        val isSelected = selectedStudentId == student.id || (student.studentCode.isNotBlank() && selectedStudentId.equals(student.studentCode, ignoreCase = true))
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
+                            border = BorderStroke(1.dp, if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { selectedStudentId = student.id }
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(10.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(36.dp)
+                                        .clip(CircleShape)
+                                        .background(Color(student.avatarColorHex).copy(alpha = 0.2f)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(student.avatarEmoji.ifBlank { "🎓" }, fontSize = 18.sp)
+                                }
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = student.name,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                        fontSize = 13.sp,
+                                        color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Text(
+                                        text = "${student.gradeSection} • Código: ${student.studentCode.ifBlank { student.id }}",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                if (isSelected) {
+                                    Icon(
+                                        imageVector = Icons.Default.Check,
+                                        contentDescription = "Seleccionado",
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    onLink(selectedStudentId.ifBlank { null })
+                    onDismiss()
+                },
+                shape = RoundedCornerShape(10.dp)
+            ) {
+                Text("Guardar Vinculación 🔗")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancelar")
+            }
+        }
+    )
+}
+
+@Composable
+fun AdminAddUserDialog(
+    students: List<UserEntity> = emptyList(),
+    onDismiss: () -> Unit,
+    onAdd: (name: String, email: String, role: String, gradeSection: String, credits: Int, xp: Int, linkedChildId: String?) -> Unit
 ) {
     var name by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
@@ -3422,6 +3671,8 @@ fun AdminAddUserDialog(
     var gradeSection by remember { mutableStateOf("10° Grado") }
     var creditsStr by remember { mutableStateOf("100") }
     var xpStr by remember { mutableStateOf("50") }
+    var selectedLinkedStudentId by remember { mutableStateOf("") }
+    var showChildPicker by remember { mutableStateOf(false) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -3481,6 +3732,38 @@ fun AdminAddUserDialog(
                     shape = RoundedCornerShape(12.dp)
                 )
 
+                if (selectedRole == UserRole.PARENT.code) {
+                    val currentSelectedChild = remember(selectedLinkedStudentId, students) {
+                        students.find { it.id == selectedLinkedStudentId || (it.studentCode.isNotBlank() && it.studentCode.equals(selectedLinkedStudentId, ignoreCase = true)) }
+                    }
+
+                    Column {
+                        Text("Hijo/a a Vincular (Estudiante):", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { showChildPicker = true }
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(14.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = if (currentSelectedChild != null) "🎓 ${currentSelectedChild.name} (${currentSelectedChild.gradeSection})" else "-- Seleccionar estudiante --",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = if (currentSelectedChild != null) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Text("▼", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                    }
+                }
+
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(
                         value = creditsStr,
@@ -3509,7 +3792,8 @@ fun AdminAddUserDialog(
                             selectedRole,
                             gradeSection,
                             creditsStr.toIntOrNull() ?: 100,
-                            xpStr.toIntOrNull() ?: 50
+                            xpStr.toIntOrNull() ?: 50,
+                            if (selectedRole == UserRole.PARENT.code) selectedLinkedStudentId.ifBlank { null } else null
                         )
                         onDismiss()
                     }
@@ -3523,13 +3807,62 @@ fun AdminAddUserDialog(
             TextButton(onClick = onDismiss) { Text("Cancelar") }
         }
     )
+
+    if (showChildPicker) {
+        AlertDialog(
+            onDismissRequest = { showChildPicker = false },
+            title = { Text("Seleccionar Estudiante") },
+            text = {
+                LazyColumn(
+                    modifier = Modifier.fillMaxWidth().heightIn(max = 300.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    item {
+                        Surface(
+                            modifier = Modifier.fillMaxWidth().clickable {
+                                selectedLinkedStudentId = ""
+                                showChildPicker = false
+                            },
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text("-- Sin vincular por ahora --", modifier = Modifier.padding(10.dp), fontSize = 13.sp)
+                        }
+                    }
+                    items(students.sortedBy { it.name }, key = { it.id }) { s ->
+                        Surface(
+                            modifier = Modifier.fillMaxWidth().clickable {
+                                selectedLinkedStudentId = s.id
+                                showChildPicker = false
+                            },
+                            color = if (selectedLinkedStudentId == s.id) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Row(modifier = Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Text(s.avatarEmoji.ifBlank { "🎓" }, fontSize = 16.sp)
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Column {
+                                    Text(s.name, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                                    Text("${s.gradeSection} • ${s.studentCode.ifBlank { s.id }}", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showChildPicker = false }) { Text("Cerrar") }
+            }
+        )
+    }
 }
 
 @Composable
 fun AdminEditUserDialog(
     user: UserEntity,
+    students: List<UserEntity> = emptyList(),
     onDismiss: () -> Unit,
-    onSave: (name: String, email: String, role: String, gradeSection: String, credits: Int, xp: Int, code: String) -> Unit
+    onSave: (name: String, email: String, role: String, gradeSection: String, credits: Int, xp: Int, code: String, linkedChildId: String?) -> Unit
 ) {
     var name by remember { mutableStateOf(user.name) }
     var email by remember { mutableStateOf(user.email) }
@@ -3538,6 +3871,8 @@ fun AdminEditUserDialog(
     var creditsStr by remember { mutableStateOf(user.credits.toString()) }
     var xpStr by remember { mutableStateOf(user.xp.toString()) }
     var code by remember { mutableStateOf(if (user.role == UserRole.TEACHER.code) user.teacherCode else user.studentCode) }
+    var selectedLinkedStudentId by remember { mutableStateOf(user.linkedStudentId.orEmpty()) }
+    var showChildPicker by remember { mutableStateOf(false) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -3572,6 +3907,38 @@ fun AdminEditUserDialog(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp)
                 )
+
+                if (user.role == UserRole.PARENT.code) {
+                    val currentSelectedChild = remember(selectedLinkedStudentId, students) {
+                        students.find { it.id == selectedLinkedStudentId || (it.studentCode.isNotBlank() && it.studentCode.equals(selectedLinkedStudentId, ignoreCase = true)) }
+                    }
+
+                    Column {
+                        Text("Hijo/a Vinculado (Estudiante):", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { showChildPicker = true }
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(14.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = if (currentSelectedChild != null) "🎓 ${currentSelectedChild.name} (${currentSelectedChild.gradeSection})" else "-- Ninguno / Desvincular --",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = if (currentSelectedChild != null) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Text("▼", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                    }
+                }
 
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(
@@ -3609,7 +3976,8 @@ fun AdminEditUserDialog(
                         gradeSection,
                         creditsStr.toIntOrNull() ?: user.credits,
                         xpStr.toIntOrNull() ?: user.xp,
-                        code
+                        code,
+                        if (user.role == UserRole.PARENT.code) selectedLinkedStudentId.ifBlank { null } else null
                     )
                     onDismiss()
                 }
@@ -3621,6 +3989,54 @@ fun AdminEditUserDialog(
             TextButton(onClick = onDismiss) { Text("Cancelar") }
         }
     )
+
+    if (showChildPicker) {
+        AlertDialog(
+            onDismissRequest = { showChildPicker = false },
+            title = { Text("Seleccionar Estudiante") },
+            text = {
+                LazyColumn(
+                    modifier = Modifier.fillMaxWidth().heightIn(max = 300.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    item {
+                        Surface(
+                            modifier = Modifier.fillMaxWidth().clickable {
+                                selectedLinkedStudentId = ""
+                                showChildPicker = false
+                            },
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text("-- Ninguno / Desvincular --", modifier = Modifier.padding(10.dp), fontSize = 13.sp)
+                        }
+                    }
+                    items(students.sortedBy { it.name }, key = { it.id }) { s ->
+                        Surface(
+                            modifier = Modifier.fillMaxWidth().clickable {
+                                selectedLinkedStudentId = s.id
+                                showChildPicker = false
+                            },
+                            color = if (selectedLinkedStudentId == s.id) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Row(modifier = Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Text(s.avatarEmoji.ifBlank { "🎓" }, fontSize = 16.sp)
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Column {
+                                    Text(s.name, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                                    Text("${s.gradeSection} • ${s.studentCode.ifBlank { s.id }}", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showChildPicker = false }) { Text("Cerrar") }
+            }
+        )
+    }
 }
 
 @Composable

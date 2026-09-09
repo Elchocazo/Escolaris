@@ -1623,7 +1623,8 @@ class SchoolViewModel @JvmOverloads constructor(
         role: String,
         gradeSection: String,
         initialCredits: Int = 100,
-        initialXp: Int = 50
+        initialXp: Int = 50,
+        linkedStudentId: String? = null
     ) {
         viewModelScope.launch {
             val validName = ValidationUtils.formatProperNoun(name)
@@ -1642,6 +1643,7 @@ class SchoolViewModel @JvmOverloads constructor(
             val studentCode = if (role == UserRole.STUDENT.code) "ESC-" + (100000..999999).random() else ""
             val teacherCode = if (role == UserRole.TEACHER.code) "DOC-" + (100000..999999).random() else ""
             val emoji = if (role == UserRole.TEACHER.code) "👨‍🏫" else if (role == UserRole.PARENT.code) "👨‍👩‍👧" else "🎓"
+            val cleanLinkedId = if (role == UserRole.PARENT.code) linkedStudentId?.trim()?.ifBlank { null } else null
 
             val newUser = UserEntity(
                 id = uid,
@@ -1654,14 +1656,15 @@ class SchoolViewModel @JvmOverloads constructor(
                 studentCode = studentCode,
                 teacherCode = teacherCode,
                 avatarEmoji = emoji,
-                bio = if (role == UserRole.TEACHER.code) "Docente en Escolaris 👨‍🏫" else if (role == UserRole.PARENT.code) "Acudiente en Escolaris 👨‍👩‍👧" else "Estudiante en Escolaris 🚀"
+                bio = if (role == UserRole.TEACHER.code) "Docente en Escolaris 👨‍🏫" else if (role == UserRole.PARENT.code) "Acudiente en Escolaris 👨‍👩‍👧" else "Estudiante en Escolaris 🚀",
+                linkedStudentId = cleanLinkedId
             )
             repository.insertUser(newUser)
 
             // Guardar permanentemente en Cloud Firestore
             try {
                 val store = FirebaseFirestore.getInstance()
-                val firestoreData = hashMapOf(
+                val firestoreData = hashMapOf<String, Any?>(
                     "id" to uid,
                     "name" to validName,
                     "email" to validEmail,
@@ -1673,6 +1676,7 @@ class SchoolViewModel @JvmOverloads constructor(
                     "teacherCode" to teacherCode,
                     "avatarEmoji" to emoji,
                     "bio" to newUser.bio,
+                    "linkedStudentId" to cleanLinkedId,
                     "createdAt" to System.currentTimeMillis()
                 )
                 store.collection("users").document(uid).set(firestoreData, SetOptions.merge()).await()
@@ -1692,11 +1696,13 @@ class SchoolViewModel @JvmOverloads constructor(
         gradeSection: String,
         credits: Int,
         xp: Int,
-        code: String
+        code: String,
+        linkedStudentId: String? = null
     ) {
         viewModelScope.launch {
             val user = repository.getUserDirect(userId) ?: return@launch
             val cleanName = ValidationUtils.formatProperNoun(name.trim().ifBlank { user.name })
+            val cleanLinkedId = if (role == UserRole.PARENT.code) linkedStudentId?.trim()?.ifBlank { null } else user.linkedStudentId
             val updated = user.copy(
                 name = cleanName,
                 email = email.trim().lowercase().ifBlank { user.email },
@@ -1705,14 +1711,15 @@ class SchoolViewModel @JvmOverloads constructor(
                 credits = credits.coerceAtLeast(0),
                 xp = xp.coerceAtLeast(0),
                 studentCode = if (role == UserRole.STUDENT.code) (code.trim().uppercase().ifBlank { user.studentCode }) else user.studentCode,
-                teacherCode = if (role == UserRole.TEACHER.code) (code.trim().uppercase().ifBlank { user.teacherCode }) else user.teacherCode
+                teacherCode = if (role == UserRole.TEACHER.code) (code.trim().uppercase().ifBlank { user.teacherCode }) else user.teacherCode,
+                linkedStudentId = cleanLinkedId
             )
             repository.updateUser(updated)
 
             // Actualizar permanentemente en Cloud Firestore
             try {
                 val store = FirebaseFirestore.getInstance()
-                val updates = hashMapOf<String, Any>(
+                val updates = hashMapOf<String, Any?>(
                     "name" to updated.name,
                     "email" to updated.email,
                     "role" to updated.role,
@@ -1721,6 +1728,7 @@ class SchoolViewModel @JvmOverloads constructor(
                     "xp" to updated.xp,
                     "studentCode" to updated.studentCode,
                     "teacherCode" to updated.teacherCode,
+                    "linkedStudentId" to cleanLinkedId,
                     "updatedAt" to System.currentTimeMillis()
                 )
                 store.collection("users").document(userId).set(updates, SetOptions.merge()).await()
@@ -1732,6 +1740,40 @@ class SchoolViewModel @JvmOverloads constructor(
                 loadActiveUser(userId)
             }
             _userMessage.value = "💾 Datos de '${updated.name}' actualizados"
+        }
+    }
+
+    fun adminLinkParentToStudent(parentId: String, studentId: String?) {
+        viewModelScope.launch {
+            try {
+                val parent = repository.getUserDirect(parentId) ?: return@launch
+                val cleanStudentId = studentId?.trim()?.ifBlank { null }
+                val updated = parent.copy(linkedStudentId = cleanStudentId)
+                repository.updateUser(updated)
+
+                // Actualizar de forma atómica en Cloud Firestore
+                val store = FirebaseFirestore.getInstance()
+                val updates = hashMapOf<String, Any?>(
+                    "linkedStudentId" to cleanStudentId,
+                    "updatedAt" to System.currentTimeMillis()
+                )
+                store.collection("users").document(parentId).set(updates, SetOptions.merge()).await()
+
+                if (_currentUserId.value == parentId) {
+                    loadActiveUser(parentId)
+                }
+
+                val child = if (cleanStudentId != null) repository.getUserDirect(cleanStudentId) else null
+                val childName = child?.name ?: cleanStudentId
+
+                _userMessage.value = if (childName != null) {
+                    "🎉 ¡${parent.name} vinculado con éxito a $childName!"
+                } else {
+                    "ℹ️ Se ha desvinculado el estudiante de ${parent.name}"
+                }
+            } catch (e: Exception) {
+                _userMessage.value = "Error al vincular: ${e.message}"
+            }
         }
     }
 

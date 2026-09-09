@@ -3242,7 +3242,24 @@ function renderAdminUsers() {
     const roleBadge = role === 'TEACHER' ? `<span class="badge" style="background:#d1fae5; color:#065f46;">👨‍🏫 Docente</span>` : (role === 'PARENT' ? `<span class="badge" style="background:#ede9fe; color:#5b21b6;">👨‍👩‍👧 Acudiente</span>` : `<span class="badge badge-priority-media">🎓 Estudiante</span>`);
     const avatar = u.photoUri ? `<img src="${u.photoUri}" alt="${u.name}" class="avatar-img-fit">` : (u.avatarEmoji || (role === 'TEACHER' ? '👨‍🏫' : (role === 'PARENT' ? '👨‍👩‍👧' : '🎓')));
     const code = role === 'TEACHER' ? (u.teacherCode || 'DOC-...') : (u.studentCode || 'ESC-...');
-    const extraInfo = role === 'TEACHER' ? (u.teacherSubject || 'Docente Titular') : (role === 'PARENT' ? (u.linkedStudentId ? `Hijo enlazado: ${u.linkedStudentId}` : 'Sin hijo vinculado') : `${u.gradeSection || '10° Grado'}${u.linkedTeacherCode ? ` • Aula: ${u.linkedTeacherCode}` : ''}`);
+    
+    let extraInfo = '';
+    let linkParentBtn = '';
+    if (role === 'TEACHER') {
+      extraInfo = u.teacherSubject || 'Docente Titular';
+    } else if (role === 'PARENT') {
+      const child = allUsers.find(s => s.id === u.linkedStudentId || (s.studentCode && s.studentCode === u.linkedStudentId));
+      if (child) {
+        extraInfo = `<strong style="color:var(--primary);">🎓 Hijo/a: ${child.name} (${child.gradeSection || '10° Grado'})</strong>`;
+      } else if (u.linkedStudentId) {
+        extraInfo = `<span>Hijo enlazado: ${u.linkedStudentId}</span>`;
+      } else {
+        extraInfo = `<span style="color:#ef4444; font-weight:800;">⚠️ Sin hijo vinculado</span>`;
+      }
+      linkParentBtn = `<button class="btn-primary btn-sm" style="background:#2563eb; color:#fff;" onclick="openLinkParentModal('${u.id}')" title="Vincular con estudiante">🔗 Vincular Hijo</button>`;
+    } else {
+      extraInfo = `${u.gradeSection || '10° Grado'}${u.linkedTeacherCode ? ` • Aula: ${u.linkedTeacherCode}` : ''}`;
+    }
 
     return `
       <div class="admin-user-card">
@@ -3268,6 +3285,7 @@ function renderAdminUsers() {
           </div>
 
           <div class="admin-user-actions">
+            ${linkParentBtn}
             <button class="btn-secondary btn-sm" onclick="openEditUserModal('${u.id}')" title="Editar datos">✏️ Editar</button>
             <button class="btn-secondary btn-sm" onclick="openAdjustPointsModal('${u.id}')" title="Ajustar puntos">🪙 Puntos</button>
             ${u.id !== currentUser.id ? `
@@ -3280,7 +3298,21 @@ function renderAdminUsers() {
   }).join('');
 }
 
-// User CRUD Helpers
+// User CRUD & Parent Linking Helpers
+function populateStudentSelect(selectId, selectedValue = '') {
+  const select = document.getElementById(selectId);
+  if (!select) return;
+  const students = allUsers
+    .filter(u => (u.role || 'STUDENT') === 'STUDENT')
+    .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+
+  select.innerHTML = '<option value="">-- Sin vincular / Ninguno --</option>' +
+    students.map(s => {
+      const isSelected = (s.id === selectedValue || (s.studentCode && s.studentCode === selectedValue));
+      return `<option value="${s.id}" ${isSelected ? 'selected' : ''}>${s.name} • ${s.gradeSection || '10° Grado'} (${s.studentCode || s.id})</option>`;
+    }).join('');
+}
+
 function toggleAddUserRoleFields(role) {
   const gradeGroup = document.getElementById('add-user-grade-group');
   const subjectGroup = document.getElementById('add-user-subject-group');
@@ -3288,15 +3320,97 @@ function toggleAddUserRoleFields(role) {
 
   if (gradeGroup) gradeGroup.classList.toggle('hidden', role !== 'STUDENT');
   if (subjectGroup) subjectGroup.classList.toggle('hidden', role !== 'TEACHER');
-  if (childGroup) childGroup.classList.toggle('hidden', role !== 'PARENT');
+  if (childGroup) {
+    childGroup.classList.toggle('hidden', role !== 'PARENT');
+    if (role === 'PARENT') populateStudentSelect('add-user-child-select');
+  }
 }
 
 function toggleEditUserRoleFields(role) {
   const gradeGroup = document.getElementById('edit-user-grade-group');
   const subjectGroup = document.getElementById('edit-user-subject-group');
+  const childGroup = document.getElementById('edit-user-child-group');
 
   if (gradeGroup) gradeGroup.classList.toggle('hidden', role !== 'STUDENT');
   if (subjectGroup) subjectGroup.classList.toggle('hidden', role !== 'TEACHER');
+  if (childGroup) {
+    childGroup.classList.toggle('hidden', role !== 'PARENT');
+    if (role === 'PARENT') {
+      const user = allUsers.find(u => u.id === document.getElementById('edit-user-id')?.value);
+      populateStudentSelect('edit-user-child-select', user?.linkedStudentId || '');
+    }
+  }
+}
+
+function openLinkParentModal(parentId) {
+  const parent = allUsers.find(u => u.id === parentId);
+  if (!parent) return;
+
+  const idInput = document.getElementById('link-parent-id');
+  const nameDisplay = document.getElementById('link-parent-name-display');
+
+  if (idInput) idInput.value = parent.id;
+  if (nameDisplay) nameDisplay.value = `${parent.name} (${parent.email || 'Sin correo'})`;
+
+  populateStudentSelect('link-parent-student-select', parent.linkedStudentId || '');
+  openModal('modal-link-parent');
+}
+
+async function handleSaveParentLink(e) {
+  e.preventDefault();
+  const parentId = document.getElementById('link-parent-id').value;
+  const select = document.getElementById('link-parent-student-select');
+  const selectedStudentId = select ? select.value.trim() : '';
+
+  if (!parentId) return;
+
+  try {
+    showToast("Guardando vinculación...");
+    await db.collection('users').doc(parentId).update({
+      linkedStudentId: selectedStudentId || null,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+
+    const parent = allUsers.find(u => u.id === parentId);
+    if (parent) parent.linkedStudentId = selectedStudentId || null;
+    if (currentUser && currentUser.id === parentId) currentUser.linkedStudentId = selectedStudentId || null;
+
+    closeModal('modal-link-parent');
+    renderAdminUsers();
+
+    const student = allUsers.find(u => u.id === selectedStudentId);
+    if (student) {
+      showToast(`🎉 ¡${parent ? parent.name : 'Acudiente'} vinculado exitosamente con ${student.name}!`);
+    } else {
+      showToast("ℹ️ Acudiente desvinculado con éxito");
+    }
+  } catch (err) {
+    alert("Error al vincular: " + err.message);
+  }
+}
+
+async function handleUnlinkParent() {
+  const parentId = document.getElementById('link-parent-id').value;
+  if (!parentId) return;
+  if (!confirm("¿Deseas desvincular a este acudiente del estudiante actual?")) return;
+
+  try {
+    showToast("Desvinculando acudiente...");
+    await db.collection('users').doc(parentId).update({
+      linkedStudentId: null,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+
+    const parent = allUsers.find(u => u.id === parentId);
+    if (parent) parent.linkedStudentId = null;
+    if (currentUser && currentUser.id === parentId) currentUser.linkedStudentId = null;
+
+    closeModal('modal-link-parent');
+    renderAdminUsers();
+    showToast("ℹ️ Acudiente desvinculado correctamente.");
+  } catch (err) {
+    alert("Error al desvincular: " + err.message);
+  }
 }
 
 async function handleCreateUser(e) {
@@ -3306,7 +3420,8 @@ async function handleCreateUser(e) {
   const role = document.getElementById('add-user-role').value;
   const grade = document.getElementById('add-user-grade').value;
   const subject = document.getElementById('add-user-subject') ? document.getElementById('add-user-subject').value.trim() : '';
-  const childCode = document.getElementById('add-user-childcode') ? document.getElementById('add-user-childcode').value.trim().toUpperCase() : '';
+  const childSelect = document.getElementById('add-user-child-select');
+  const childCode = childSelect ? childSelect.value.trim() : '';
   const credits = parseInt(document.getElementById('add-user-credits').value, 10) || 0;
   const xp = parseInt(document.getElementById('add-user-xp').value, 10) || 0;
 
@@ -3323,7 +3438,7 @@ async function handleCreateUser(e) {
       role: role,
       gradeSection: role === 'STUDENT' ? grade : (role === 'TEACHER' ? (subject || 'Docente Titular') : 'Familiar'),
       teacherSubject: role === 'TEACHER' ? subject : '',
-      linkedStudentId: role === 'PARENT' ? childCode : '',
+      linkedStudentId: role === 'PARENT' ? (childCode || null) : '',
       credits: credits,
       xp: xp,
       streakDays: 1,
@@ -3358,6 +3473,7 @@ function openEditUserModal(userId) {
   document.getElementById('edit-user-xp').value = user.xp || 0;
   document.getElementById('edit-user-code').value = user.role === 'TEACHER' ? (user.teacherCode || '') : (user.studentCode || '');
 
+  populateStudentSelect('edit-user-child-select', user.linkedStudentId || '');
   toggleEditUserRoleFields(user.role || 'STUDENT');
   openModal('modal-edit-user');
 }
@@ -3370,6 +3486,8 @@ async function handleUpdateUser(e) {
   const role = document.getElementById('edit-user-role').value;
   const grade = document.getElementById('edit-user-grade').value.trim();
   const subject = document.getElementById('edit-user-subject').value.trim();
+  const childSelect = document.getElementById('edit-user-child-select');
+  const childId = childSelect ? childSelect.value.trim() : '';
   const credits = parseInt(document.getElementById('edit-user-credits').value, 10) || 0;
   const xp = parseInt(document.getElementById('edit-user-xp').value, 10) || 0;
   const code = document.getElementById('edit-user-code').value.trim().toUpperCase();
@@ -3385,6 +3503,9 @@ async function handleUpdateUser(e) {
       xp: xp
     };
 
+    if (role === 'PARENT') {
+      updates.linkedStudentId = childId || null;
+    }
     if (role === 'TEACHER' && code) updates.teacherCode = code;
     if (role === 'STUDENT' && code) updates.studentCode = code;
 

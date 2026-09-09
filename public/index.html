@@ -1287,8 +1287,10 @@
           <input type="text" id="add-user-subject" class="form-input" placeholder="Ej: Matemáticas & Física">
         </div>
         <div class="form-group hidden" id="add-user-childcode-group">
-          <label class="form-label">Código de Hijo/a a Vincular</label>
-          <input type="text" id="add-user-childcode" class="form-input" placeholder="ESC-XXXXXX" style="text-transform:uppercase;">
+          <label class="form-label">Hijo/a a Vincular (Estudiante)</label>
+          <select id="add-user-child-select" class="form-select">
+            <option value="">-- Sin vincular por ahora --</option>
+          </select>
         </div>
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
           <div class="form-group">
@@ -1338,6 +1340,12 @@
           <label class="form-label">Materia Docente</label>
           <input type="text" id="edit-user-subject" class="form-input" placeholder="Ej: Matemáticas">
         </div>
+        <div class="form-group hidden" id="edit-user-child-group">
+          <label class="form-label">Hijo/a Vinculado (Estudiante)</label>
+          <select id="edit-user-child-select" class="form-select">
+            <option value="">-- Ninguno / Desvincular --</option>
+          </select>
+        </div>
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
           <div class="form-group">
             <label class="form-label">Créditos 🪙</label>
@@ -1355,6 +1363,38 @@
         <div class="modal-actions-row">
           <button type="button" class="btn-secondary flex-1" onclick="closeModal('modal-edit-user')">Cancelar</button>
           <button type="submit" class="btn-primary flex-1">Guardar Cambios 💾</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: LINK PARENT TO STUDENT (Admin Direct Link) -->
+  <div id="modal-link-parent" class="modal-backdrop">
+    <div class="modal-card">
+      <div style="text-align:center; margin-bottom:12px;">
+        <div style="font-size:36px; margin-bottom:6px;">👨‍👧</div>
+        <h3 class="modal-title">Vincular Padre con Estudiante</h3>
+        <p style="font-size:12px; color:var(--text-muted); margin-top:2px;">Conecta al acudiente para que visualice en tiempo real el progreso de su hijo/a.</p>
+      </div>
+      <form onsubmit="handleSaveParentLink(event)" class="modal-form">
+        <input type="hidden" id="link-parent-id">
+        <div class="form-group">
+          <label class="form-label">Acudiente / Padre de Familia</label>
+          <input type="text" id="link-parent-name-display" class="form-input" readonly style="background:var(--bg-card); opacity:0.85; font-weight:700;">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Seleccionar Estudiante (Hijo/a)</label>
+          <select id="link-parent-student-select" class="form-select" style="font-size:14px; padding:10px;">
+            <option value="">-- Selecciona un estudiante --</option>
+          </select>
+        </div>
+        <p style="font-size:11px; color:var(--text-muted); line-height:1.4; margin-top:-4px; margin-bottom:14px;">
+          💡 Al guardar, el acudiente tendrá acceso inmediato a las tareas, calificaciones, retardos y saldo escolar de su hijo/a.
+        </p>
+        <div class="modal-actions-row">
+          <button type="button" class="btn-secondary flex-1" onclick="closeModal('modal-link-parent')">Cancelar</button>
+          <button type="button" class="btn-secondary" style="color:var(--danger); border-color:var(--danger);" onclick="handleUnlinkParent()">Desvincular</button>
+          <button type="submit" class="btn-primary flex-1" style="background:#2563eb;">Vincular 🔗</button>
         </div>
       </form>
     </div>
