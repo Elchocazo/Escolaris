@@ -148,18 +148,20 @@ fun EscolarisApp(viewModel: SchoolViewModel) {
     // Role-dependent navigation items
     val currentRole = currentUser?.role ?: UserRole.STUDENT.code
     val isTeacherOrAdmin = UserRole.isTeacherOrAdmin(currentRole) || (currentUser?.email?.equals("moz658@gmail.com", ignoreCase = true) == true)
-    val navItems = remember(currentRole, isTeacherOrAdmin) {
+    val isParent = currentRole.equals(UserRole.PARENT.code, ignoreCase = true) || currentRole.equals("ACUDIENTE", ignoreCase = true)
+
+    val navItems = remember(currentRole, isTeacherOrAdmin, isParent) {
         when {
             isTeacherOrAdmin -> listOf(
-                Screen.Feed,
                 Screen.TeacherAdmin,
+                Screen.Feed,
                 Screen.Profile,
                 Screen.Course,
                 Screen.Gamification
             )
-            currentRole.equals(UserRole.PARENT.code, ignoreCase = true) -> listOf(
-                Screen.Feed,
+            isParent -> listOf(
                 Screen.ParentDashboard,
+                Screen.Feed,
                 Screen.Profile,
                 Screen.ParentChild,
                 Screen.Course
@@ -174,25 +176,44 @@ fun EscolarisApp(viewModel: SchoolViewModel) {
         }
     }
 
-    val defaultScreen = navItems.first()
-    var currentScreen by remember { mutableStateOf<Screen>(defaultScreen) }
-    val screenBackStack = remember { mutableStateListOf<Screen>() }
-    var showNotificationsDialog by remember { mutableStateOf(false) }
-
-    // Interceptar botón atrás del sistema para volver a la pantalla anterior o principal
-    BackHandler(enabled = currentScreen.route != defaultScreen.route || screenBackStack.isNotEmpty()) {
-        if (screenBackStack.isNotEmpty()) {
-            currentScreen = screenBackStack.removeAt(screenBackStack.lastIndex)
-        } else {
-            currentScreen = defaultScreen
+    val primaryScreen = remember(currentRole, isTeacherOrAdmin, isParent) {
+        when {
+            isTeacherOrAdmin -> Screen.TeacherAdmin
+            isParent -> Screen.ParentDashboard
+            else -> Screen.Feed
         }
     }
 
-    // Ensure active screen is allowed for role
+    val defaultScreen = navItems.first()
+    var currentScreen by remember { mutableStateOf<Screen>(primaryScreen) }
+    val screenBackStack = remember { mutableStateListOf<Screen>() }
+    var showNotificationsDialog by remember { mutableStateOf(false) }
+    var previousRole by remember { mutableStateOf(currentRole) }
+
+    // Interceptar botón atrás del sistema para volver a la pantalla anterior o principal
+    BackHandler(enabled = currentScreen.route != primaryScreen.route || screenBackStack.isNotEmpty()) {
+        if (screenBackStack.isNotEmpty()) {
+            currentScreen = screenBackStack.removeAt(screenBackStack.lastIndex)
+        } else {
+            currentScreen = primaryScreen
+        }
+    }
+
+    // Ensure active screen is allowed for role & handle hot reactive role change from Firestore/Web
     LaunchedEffect(currentRole) {
-        if (!navItems.any { it.route == currentScreen.route }) {
+        if (!previousRole.equals(currentRole, ignoreCase = true)) {
+            // Hot role switch: navigate immediately to primary role screen and clear backstack
             screenBackStack.clear()
-            currentScreen = navItems.first()
+            val targetScreen = when {
+                isTeacherOrAdmin -> Screen.TeacherAdmin
+                isParent -> Screen.ParentDashboard
+                else -> Screen.Feed
+            }
+            currentScreen = targetScreen
+            previousRole = currentRole
+        } else if (!navItems.any { it.route == currentScreen.route }) {
+            screenBackStack.clear()
+            currentScreen = primaryScreen
         }
     }
 

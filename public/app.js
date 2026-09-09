@@ -523,9 +523,27 @@ function setupUserListener(uid, email, displayName, photoURL) {
   if (uid) localStorage.setItem('escolaris_session_uid', uid);
 
   userRef.onSnapshot(async (doc) => {
-    if (doc.exists) {
+    let activeDoc = doc;
+    let isPointer = false;
+
+    // Si el documento en users/{uid} tiene un puntero canonicalUserId, resolver al canónico
+    if (doc.exists && doc.data() && doc.data().canonicalUserId) {
+      const canonicalId = doc.data().canonicalUserId;
+      try {
+        const canonicalDoc = await db.collection('users').doc(canonicalId).get();
+        if (canonicalDoc.exists) {
+          activeDoc = canonicalDoc;
+          isPointer = true;
+        }
+      } catch (e) {
+        console.warn("Error leyendo documento canónico:", e);
+      }
+    }
+
+    if (activeDoc.exists && (!activeDoc.data().canonicalUserId || isPointer)) {
       // User profile already in Firestore
-      currentUser = { id: doc.id, ...doc.data() };
+      const canonicalId = activeDoc.id;
+      currentUser = { id: canonicalId, ...activeDoc.data() };
 
       const updates = {};
       // 1. Safeguard super teacher account
@@ -568,7 +586,7 @@ function setupUserListener(uid, email, displayName, photoURL) {
       }
 
       if (Object.keys(updates).length > 0) {
-        userRef.set(updates, { merge: true }).catch(() => {});
+        activeDoc.ref.set(updates, { merge: true }).catch(() => {});
       }
 
       closeModal('modal-onboarding');
@@ -587,11 +605,13 @@ function setupUserListener(uid, email, displayName, photoURL) {
       }
 
       if (existingDoc && existingDoc.exists) {
-        // Existing user found by email (e.g. registered on Android or Admin panel) -> migrate data to uid
+        // PRESERVAR EL ID CANÓNICO para mantener intactas tareas, notas, asistencias y vínculos familiares
+        const canonicalId = existingDoc.id;
         const existingData = existingDoc.data();
         const mergedUser = {
           ...existingData,
-          id: uid,
+          id: canonicalId,
+          authUid: uid,
           email: cleanEmail,
           photoUri: photoURL || existingData.photoUri || null,
           roleConfigured: true,
@@ -614,7 +634,19 @@ function setupUserListener(uid, email, displayName, photoURL) {
           }
         }
 
-        await userRef.set(mergedUser, { merge: true });
+        // Guardar cambios en el documento canónico
+        await existingDoc.ref.set(mergedUser, { merge: true });
+
+        // Si el UID de Auth es distinto del id canónico, guardar un puntero en users/{uid}
+        if (canonicalId !== uid) {
+          await userRef.set({
+            canonicalUserId: canonicalId,
+            authUid: uid,
+            email: cleanEmail,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+          }, { merge: true });
+        }
+
         currentUser = mergedUser;
       } else {
         // Brand new account with no previous data on any platform
@@ -1975,6 +2007,25 @@ async function handleGoogleSignIn() {
   try {
     showToast("Conectando con Google...");
     const provider = new firebase.auth.GoogleAuthProvider();
+
+    // Si ya existe una sesión activa con correo/contraseña institucional, vincular credencial de Google
+    if (auth.currentUser && !auth.currentUser.isAnonymous) {
+      try {
+        await auth.currentUser.linkWithPopup(provider);
+        showToast("✅ Cuenta de Google vinculada con éxito a tu perfil");
+        return;
+      } catch (linkErr) {
+        if (linkErr.code === 'auth/credential-already-in-use' || linkErr.code === 'auth/email-already-in-use') {
+          console.log("[Auth] Credencial de Google ya en uso. Iniciando sesión directamente con Google...");
+        } else if (linkErr.code === 'auth/provider-already-linked') {
+          showToast("ℹ️ Esta cuenta ya está vinculada con Google");
+          return;
+        } else {
+          console.warn("Aviso al vincular credencial de Google:", linkErr);
+        }
+      }
+    }
+
     await auth.signInWithPopup(provider);
   } catch (err) {
     if (err.code === 'auth/popup-blocked' || err.code === 'auth/popup-closed-by-user') {
@@ -3475,7 +3526,7 @@ async function handleUpdateUser(e) {
   e.preventDefault();
   const id = document.getElementById('edit-user-id').value;
   const name = document.getElementById('edit-user-name').value.trim();
-  const email = document.getElementById('edit-user-email').value.trim();
+  const email = document.getElementById('edit-user-email').value.trim().toLowerCase();
   const role = document.getElementById('edit-user-role').value;
   const grade = document.getElementById('edit-user-grade').value.trim();
   const subject = document.getElementById('edit-user-subject').value.trim();
@@ -3493,11 +3544,14 @@ async function handleUpdateUser(e) {
       gradeSection: role === 'STUDENT' ? grade : (role === 'TEACHER' ? subject : 'Familiar'),
       teacherSubject: role === 'TEACHER' ? subject : '',
       credits: credits,
-      xp: xp
+      xp: xp,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     };
 
     if (role === 'PARENT') {
       updates.linkedStudentId = childId || null;
+    } else {
+      updates.linkedStudentId = null;
     }
     if (role === 'TEACHER' && code) updates.teacherCode = code;
     if (role === 'STUDENT' && code) updates.studentCode = code;

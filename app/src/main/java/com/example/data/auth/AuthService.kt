@@ -533,6 +533,16 @@ class AuthService(
             if (store != null) {
                 var doc = store.collection("users").document(userId).get().await()
                 
+                // Si el doc tiene canonicalUserId (es un puntero de migración de Google Auth),
+                // redirigir al documento canónico original
+                if (doc.exists() && doc.getString("canonicalUserId") != null) {
+                    val targetCanonicalId = doc.getString("canonicalUserId")!!
+                    val targetDoc = store.collection("users").document(targetCanonicalId).get().await()
+                    if (targetDoc.exists()) {
+                        doc = targetDoc
+                    }
+                }
+
                 // If not found by direct UID document, search by email to recover previous profile data
                 if (!doc.exists() && email.isNotBlank()) {
                     val emailQuery = store.collection("users").whereEqualTo("email", email).limit(1).get().await()
@@ -542,6 +552,7 @@ class AuthService(
                 }
 
                 if (doc.exists()) {
+                    val resolvedUserId = doc.getString("id") ?: doc.id
                     val isSuperAdmin = email == "moz658@gmail.com"
                     val rawName = doc.getString("name")?.takeIf { it.isNotBlank() }
                         ?: firebaseUser.displayName?.takeIf { it.isNotBlank() }
@@ -571,7 +582,7 @@ class AuthService(
                     val photoUrl = doc.getString("photoUrl") ?: doc.getString("photoUri") ?: firebaseUser.photoUrl?.toString()
 
                     firestoreUser = UserEntity(
-                        id = userId,
+                        id = resolvedUserId,
                         name = name,
                         lastName = doc.getString("lastName") ?: "",
                         email = email,
@@ -593,12 +604,13 @@ class AuthService(
                         bannerGradientIndex = (doc.getLong("bannerGradientIndex") ?: 0L).toInt()
                     )
 
-                    // Ensure document at users/userId has merged, accurate data
+                    // Ensure canonical document has merged, accurate data
                     val syncMap = hashMapOf(
-                        "id" to userId,
+                        "id" to resolvedUserId,
                         "name" to firestoreUser.name,
                         "email" to firestoreUser.email,
                         "role" to firestoreUser.role,
+                        "authUid" to userId,
                         "studentCode" to firestoreUser.studentCode,
                         "teacherCode" to firestoreUser.teacherCode,
                         "avatarColorHex" to firestoreUser.avatarColorHex,
@@ -613,7 +625,18 @@ class AuthService(
                         "photoUri" to (firestoreUser.photoUri ?: ""),
                         "updatedAt" to System.currentTimeMillis()
                     )
-                    store.collection("users").document(userId).set(syncMap, SetOptions.merge()).await()
+                    store.collection("users").document(resolvedUserId).set(syncMap, SetOptions.merge()).await()
+
+                    // If Auth UID differs from canonical document ID, write pointer
+                    if (resolvedUserId != userId) {
+                        val pointerMap = hashMapOf(
+                            "canonicalUserId" to resolvedUserId,
+                            "authUid" to userId,
+                            "email" to email,
+                            "updatedAt" to System.currentTimeMillis()
+                        )
+                        store.collection("users").document(userId).set(pointerMap, SetOptions.merge()).await()
+                    }
                 }
             }
         } catch (e: Exception) {

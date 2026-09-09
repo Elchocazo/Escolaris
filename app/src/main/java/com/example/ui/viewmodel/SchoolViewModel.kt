@@ -2620,16 +2620,27 @@ class SchoolViewModel @JvmOverloads constructor(
                         }
 
                         // Si el usuario en sesión activa cambió en Firestore, actualizar StateFlow inmediatamente
-                        val activeId = _currentUserId.value
+                        val activeId = _currentUserId.value.ifBlank { sessionPrefs.getString(PREF_SAVED_USER_ID, "") ?: "" }
                         val activeEmail = _currentUser.value?.email?.trim()?.lowercase()
+                            ?: sessionPrefs.getString(PREF_SAVED_USER_EMAIL, "")?.trim()?.lowercase()
                         val matchedCurrent = incomingUsers.find { 
-                            it.id == activeId || (!activeEmail.isNullOrBlank() && it.email.trim().lowercase() == activeEmail) 
+                            (activeId.isNotBlank() && it.id == activeId) || 
+                            (!activeEmail.isNullOrBlank() && it.email.trim().lowercase() == activeEmail) 
                         }
                         if (matchedCurrent != null) {
                             withContext(Dispatchers.Main) {
+                                val oldRole = _currentUser.value?.role
                                 _currentUser.value = matchedCurrent
                                 _currentUserId.value = matchedCurrent.id
                                 persistSessionUser(matchedCurrent)
+                                if (oldRole != null && !oldRole.equals(matchedCurrent.role, ignoreCase = true)) {
+                                    val roleLabel = when {
+                                        UserRole.isTeacherOrAdmin(matchedCurrent.role) -> "Docente / Admin 👑"
+                                        matchedCurrent.role.equals(UserRole.PARENT.code, ignoreCase = true) || matchedCurrent.role.equals("ACUDIENTE", ignoreCase = true) -> "Acudiente 👨‍👩‍👧"
+                                        else -> "Estudiante 🎓"
+                                    }
+                                    _userMessage.value = "Tu rol ha sido actualizado a: $roleLabel"
+                                }
                             }
                         }
                     } catch (e: Exception) {

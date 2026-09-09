@@ -1147,8 +1147,9 @@
               <div class="clay-card menu-card">
                 <h4 class="card-title-simple">⚙️ Gestión de Cuenta & Seguridad</h4>
                 <p style="font-size:12px; color:var(--text-muted); margin:4px 0 12px 0;">
-                  Actualiza tus datos escolares o cierra tu sesión de forma segura.
+                  Actualiza tus datos escolares, vincula tu cuenta de Google o cierra tu sesión de forma segura.
                 </p>
+                <button class="btn-secondary menu-btn" onclick="handleGoogleSignIn()">🔗 Vincular con Cuenta de Google</button>
                 <button class="btn-secondary menu-btn" onclick="openOnboardingModal(true)">✏️ Configurar Rol y Datos</button>
                 <button class="btn-secondary menu-btn btn-danger-outline" onclick="handleSignOut()">🚪 Cerrar Sesión</button>
               </div>
@@ -2450,6 +2451,6 @@
 </div>
 
 <!-- Application Script -->
-<script src="/app.js?v=5.3"></script>
+<script src="/app.js?v=5.4"></script>
 </body>
 </html>
