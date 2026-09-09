@@ -693,13 +693,27 @@ function setupDataListeners() {
     console.log(`[Firestore] Usuarios cargados: ${allUsers.length}`);
 
     if (currentUser) {
-      const updatedMe = allUsers.find(u => u.id === currentUser.id);
+      const cleanEmail = (currentUser.email || '').trim().toLowerCase();
+      const updatedMe = allUsers.find(u => u.id === currentUser.id || (cleanEmail && (u.email || '').trim().toLowerCase() === cleanEmail));
       if (updatedMe) {
-        currentUser = { ...currentUser, ...updatedMe };
+        const previousRole = currentUser.role;
+        currentUser = { ...currentUser, ...updatedMe, id: currentUser.id || updatedMe.id };
         try {
           localStorage.setItem('escolaris_cached_user', JSON.stringify(currentUser));
         } catch (e) {}
         renderUserProfile();
+        if (previousRole !== currentUser.role) {
+          console.log(`[Role Switch] El rol del usuario cambió de ${previousRole} a ${currentUser.role}. Reconfigurando vistas...`);
+          renderNavigationForRole();
+          if (currentUser.role === 'PARENT') {
+            renderParentDashboard();
+            switchNav('parent-dashboard');
+          } else if (currentUser.role === 'TEACHER') {
+            switchNav('teacher-admin');
+          } else {
+            switchNav('feed');
+          }
+        }
       }
     }
 

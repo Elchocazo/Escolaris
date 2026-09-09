@@ -2621,10 +2621,14 @@ class SchoolViewModel @JvmOverloads constructor(
 
                         // Si el usuario en sesión activa cambió en Firestore, actualizar StateFlow inmediatamente
                         val activeId = _currentUserId.value
-                        val matchedCurrent = incomingUsers.find { it.id == activeId }
+                        val activeEmail = _currentUser.value?.email?.trim()?.lowercase()
+                        val matchedCurrent = incomingUsers.find { 
+                            it.id == activeId || (!activeEmail.isNullOrBlank() && it.email.trim().lowercase() == activeEmail) 
+                        }
                         if (matchedCurrent != null) {
                             withContext(Dispatchers.Main) {
                                 _currentUser.value = matchedCurrent
+                                _currentUserId.value = matchedCurrent.id
                                 persistSessionUser(matchedCurrent)
                             }
                         }
