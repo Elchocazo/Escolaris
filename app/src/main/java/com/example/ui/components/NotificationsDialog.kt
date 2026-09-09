@@ -6,7 +6,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -20,7 +19,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Assignment
+import androidx.compose.material.icons.automirrored.filled.Assignment
 import androidx.compose.material.icons.filled.CardGiftcard
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DoneAll
@@ -35,7 +34,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -68,90 +66,77 @@ fun NotificationsDialog(
     ) {
         Surface(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 24.dp)
-                .heightIn(max = 520.dp),
-            shape = RoundedCornerShape(24.dp),
-            color = MaterialTheme.colorScheme.surface,
-            tonalElevation = 6.dp,
-            shadowElevation = 12.dp
+                .fillMaxWidth(0.92f)
+                .heightIn(max = 560.dp),
+            shape = RoundedCornerShape(20.dp),
+            color = Color.White,
+            shadowElevation = 8.dp
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(bottom = 12.dp)
+                    .padding(bottom = 8.dp)
             ) {
-                // 1. ENCABEZADO DEL DIÁLOGO
+                // 1. CABECERA LIMPIA Y ROBUSTA
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(start = 20.dp, end = 12.dp, top = 16.dp, bottom = 12.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
+                        .padding(start = 16.dp, end = 8.dp, top = 16.dp, bottom = 12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Text(
-                            text = "Notificaciones",
-                            fontSize = 20.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
+                    Text(
+                        text = "Notificaciones",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF0F172A),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
 
-                        if (unreadCount > 0) {
-                            Surface(
-                                shape = RoundedCornerShape(12.dp),
-                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
-                            ) {
-                                Text(
-                                    text = "$unreadCount no leídas",
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-                                )
-                            }
+                    if (unreadCount > 0) {
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = Color(0xFFEFF6FF),
+                            border = BorderStroke(1.dp, Color(0xFFDBEAFE))
+                        ) {
+                            Text(
+                                text = "$unreadCount no leídas",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF2563EB),
+                                maxLines = 1,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                            )
                         }
                     }
 
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        if (unreadCount > 0) {
-                            TextButton(
-                                onClick = onMarkAllRead,
-                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.DoneAll,
-                                    contentDescription = "Leer todas",
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(
-                                    text = "Leer todas",
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = MaterialTheme.colorScheme.primary
-                                )
-                            }
-                        }
+                    Spacer(modifier = Modifier.weight(1f))
 
+                    if (unreadCount > 0) {
                         IconButton(
-                            onClick = onDismiss,
+                            onClick = onMarkAllRead,
                             modifier = Modifier.size(36.dp)
                         ) {
                             Icon(
-                                imageVector = Icons.Default.Close,
-                                contentDescription = "Cerrar",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                imageVector = Icons.Default.DoneAll,
+                                contentDescription = "Marcar todas como leídas",
+                                tint = Color(0xFF2563EB),
                                 modifier = Modifier.size(20.dp)
                             )
                         }
+                    }
+
+                    IconButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.size(36.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Cerrar",
+                            tint = Color(0xFF64748B),
+                            modifier = Modifier.size(20.dp)
+                        )
                     }
                 }
 
@@ -167,7 +152,7 @@ fun NotificationsDialog(
                         verticalArrangement = Arrangement.Center
                     ) {
                         Surface(
-                            modifier = Modifier.size(80.dp),
+                            modifier = Modifier.size(72.dp),
                             shape = CircleShape,
                             color = Color(0xFFF8FAFC)
                         ) {
@@ -175,19 +160,19 @@ fun NotificationsDialog(
                                 Icon(
                                     imageVector = Icons.Outlined.NotificationsNone,
                                     contentDescription = null,
-                                    modifier = Modifier.size(44.dp),
+                                    modifier = Modifier.size(40.dp),
                                     tint = Color(0xFF94A3B8)
                                 )
                             }
                         }
-                        Spacer(modifier = Modifier.height(16.dp))
+                        Spacer(modifier = Modifier.height(14.dp))
                         Text(
                             text = "Estás al día",
                             fontWeight = FontWeight.Bold,
-                            fontSize = 17.sp,
-                            color = MaterialTheme.colorScheme.onSurface
+                            fontSize = 16.sp,
+                            color = Color(0xFF1E293B)
                         )
-                        Spacer(modifier = Modifier.height(6.dp))
+                        Spacer(modifier = Modifier.height(4.dp))
                         Text(
                             text = "No tienes notificaciones pendientes por revisar.",
                             fontSize = 13.sp,
@@ -200,8 +185,8 @@ fun NotificationsDialog(
                         modifier = Modifier
                             .fillMaxWidth()
                             .weight(1f, fill = false)
-                            .padding(horizontal = 16.dp, vertical = 8.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                            .padding(horizontal = 14.dp, vertical = 8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         items(notifications, key = { it.id }) { item ->
                             NotificationItemCard(
@@ -224,7 +209,7 @@ private fun NotificationItemCard(
 ) {
     val (iconVector, iconBg, iconTint) = when (item.type.uppercase()) {
         "HOMEWORK", "TASK" -> Triple(
-            Icons.Default.Assignment,
+            Icons.AutoMirrored.Filled.Assignment,
             Color(0xFFEFF6FF), // Soft Blue
             Color(0xFF2563EB)  // Primary Blue
         )
@@ -259,13 +244,10 @@ private fun NotificationItemCard(
         modifier = modifier
             .fillMaxWidth()
             .clickable(onClick = onClick),
-        shape = RoundedCornerShape(16.dp),
-        color = if (item.isRead) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.primary.copy(alpha = 0.04f),
-        border = BorderStroke(
-            width = 1.dp,
-            color = if (item.isRead) Color(0xFFE2E8F0) else MaterialTheme.colorScheme.primary.copy(alpha = 0.25f)
-        ),
-        shadowElevation = if (item.isRead) 1.dp else 2.dp
+        shape = RoundedCornerShape(14.dp),
+        color = if (!item.isRead) Color(0xFFF8FAFC) else Color.White,
+        border = BorderStroke(1.dp, if (!item.isRead) Color(0xFFE2E8F0) else Color(0xFFF1F5F9)),
+        shadowElevation = 0.dp
     ) {
         Row(
             modifier = Modifier
@@ -273,11 +255,11 @@ private fun NotificationItemCard(
                 .padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Contenedor de ícono/avatar pastel redondeado (44.dp x 44.dp)
+            // Contenedor de ícono/avatar pastel redondeado fijo (40.dp x 40.dp)
             Box(
                 modifier = Modifier
-                    .size(44.dp)
-                    .clip(RoundedCornerShape(12.dp))
+                    .size(40.dp)
+                    .clip(RoundedCornerShape(10.dp))
                     .background(iconBg),
                 contentAlignment = Alignment.Center
             ) {
@@ -285,13 +267,13 @@ private fun NotificationItemCard(
                     imageVector = iconVector,
                     contentDescription = null,
                     tint = iconTint,
-                    modifier = Modifier.size(22.dp)
+                    modifier = Modifier.size(20.dp)
                 )
             }
 
             Spacer(modifier = Modifier.width(12.dp))
 
-            // Columna central de contenido
+            // Columna de textos ocupando todo el ancho disponible
             Column(
                 modifier = Modifier.weight(1f)
             ) {
@@ -299,20 +281,20 @@ private fun NotificationItemCard(
                     text = item.title,
                     fontWeight = FontWeight.SemiBold,
                     fontSize = 14.sp,
-                    color = MaterialTheme.colorScheme.onSurface,
+                    color = Color(0xFF1E293B),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
                     text = item.message,
-                    fontSize = 13.sp,
-                    color = Color(0xFF475569),
-                    lineHeight = 18.sp,
+                    fontSize = 12.sp,
+                    color = Color(0xFF64748B),
+                    lineHeight = 16.sp,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(3.dp))
                 Text(
                     text = formatFriendlyNotificationDate(item.timestamp),
                     fontSize = 11.sp,
@@ -320,7 +302,7 @@ private fun NotificationItemCard(
                 )
             }
 
-            // Indicador de estado no leído (círculo azul de 8.dp)
+            // Punto azul de no leído alineado a la derecha
             if (!item.isRead) {
                 Spacer(modifier = Modifier.width(8.dp))
                 Box(
