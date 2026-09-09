@@ -1323,7 +1323,7 @@ object DatabaseInitializer {
             phoneNumber = "3103571787"
         ),
         UserEntity(
-            id = "par_129621021_1",
+            id = "rAEDBZFlFOYOV5e1B9UhG0ZI95F2",
             name = "Lina Ordoñez",
             email = "marceordo9521@gmail.com",
             role = "PARENT",
@@ -1332,13 +1332,14 @@ object DatabaseInitializer {
             avatarInitials = "LO",
             gradeSection = "Padre/Tutor de Danna Salomé Bolaños",
             streakDays = 1,
-            xp = 50,
+            xp = 350,
             level = 1,
-            credits = 100,
-            parentIncentiveCredits = 100,
+            credits = 300,
+            parentIncentiveCredits = 200,
             linkedStudentId = "std_129621021",
             bio = "Acudiente de Danna Salomé Bolaños Ordóñez | Tel: 3103571787 | Altos de Santa Inés Torre C Apto 803",
             avatarEmoji = "👨‍👩‍👧",
+            photoUri = "https://lh3.googleusercontent.com/a/ACg8ocIYv9bKOzTGooFmmfVT_8hHyw0PpFoF5wyYQgIfe4dB2RgQjg=s96-c",
             phoneNumber = "3103571787"
         ),
 

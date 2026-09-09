@@ -3,9 +3,9 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Regla para usuarios: Permite todo excepto recrear la cuenta zombi de Doris (@escolaris)
+    // Regla para usuarios: Permite todo excepto recrear cuentas duplicadas/zombis
     match /users/{userId} {
-      allow create, update: if userId != 'par_1061791400_1';
+      allow create, update: if userId != 'par_1061791400_1' && userId != 'par_129621021_1';
       allow read, delete: if true;
     }
 
